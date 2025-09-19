@@ -1,0 +1,21 @@
+name: precise-mrd-mini
+dependencies:
+  - python>=3.11
+  - numpy
+  - pandas
+  - scipy
+  - statsmodels
+  - matplotlib
+  - pydantic
+  - typer
+  - snakemake
+  - pytest
+  - pytest-cov
+  - black
+  - isort
+  - mypy
+  - jinja2
+channels:
+  - conda-forge
+  - bioconda
+  - defaults

@@ -1,0 +1,9 @@
+# Oncology 2025 Abstract (300 words)
+
+**Background:** Minimal residual disease (MRD) monitoring demands extreme sensitivity while restraining false positives. We built *precise-mrd-mini*, a reproducible simulation plus analysis kit, to stress-test UMI-aware ctDNA workflows before lab validation.
+
+**Methods:** Synthetic cohorts were generated with configurable variant allele fractions (VAF 0–0.5%), mean depth 800×, and geometric UMI family sizes (p=0.35). Reads were collapsed with Hamming≤1 clustering and minimum family size 2. Background error rates were fitted via method-of-moments beta-binomial models with simulated panels-of-normals when empirical counts were zero. Variant evidence was combined using Stouffer z-scores (weights √depth) alongside Fisher’s method; Benjamini–Hochberg controlled FDR at 5%. Reports assembled QC metrics, ROC/PR curves, and LoD grids.
+
+**Results:** Across 25-variant panels, median family size was 2.4 (IQR 2–3) and duplication rate declined to 0.38. The fitted error prior (α≈1.7, β≈2800) preserved specificity: zero-VAF controls remained q>0.2. Variants at 0.5% VAF achieved median q=1.5e-3 with Stouffer z>6, while 0.1% VAF variants maintained q≈0.04. Aggregating ≥3 informative loci produced global MRD-positive calls (z>5, p<3e-7). Synthetic sweeps indicated LoD50 ≈0.004 (depth 800, n=25) and LoD95 ≈0.007, with performance scalable through additional loci or deeper coverage.
+
+**Conclusions:** The toolkit delivers deterministic, fast-running benchmarks that map job responsibilities—simulation, consensus, statistics, reporting—onto a compact repo ready for expansion. While limited to in-silico data, the beta-binomial + UMI design choices align with emerging ctDNA best practices and give assay teams a transparent sandbox for iteration. Next steps include calibrating priors on real panels, integrating fragment-size features, and validating against CLIA-style dilution series.

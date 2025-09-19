@@ -1,0 +1,31 @@
+# Precise MRD Mini Report
+
+## Title
+Synthetic MRD Assessment for {{ patient_id }}
+
+## Methods Snapshot
+- Simulated variants: {{ n_variants }}
+- Beta-binomial params (sample): {{ error_model[0]['alpha'] | round(2) }} / {{ error_model[0]['beta'] | round(2) if error_model }}
+- QC summary: {{ qc | tojson }}
+
+## MRD Call Summary
+| Metric | Value |
+| --- | --- |
+| Positives | {{ positives }} |
+| Total variants | {{ total_variants }} |
+| Global Stouffer z | {{ stouffer_z | round(2) }} |
+| Global p | {{ stouffer_p | scientific }} |
+| Fisher p | {{ fisher_p | scientific }} |
+
+## Figures
+![Family sizes]({{ figures.family.as_posix() }})
+![Error violin]({{ figures.error_violin.as_posix() }})
+![ROC]({{ figures.roc.as_posix() }})
+![PR]({{ figures.pr.as_posix() }})
+
+## Detection Limits
+LoD grid stored at {{ figures.lod.as_posix() }}
+
+## Variant Table (excerpt)
+{% for call in calls[:10] %}- {{ call.chrom }}:{{ call.pos }} p={{ '%.3g'|format(call.p_value) }} q={{ '%.3g'|format(call.q_value) }}
+{% endfor %}

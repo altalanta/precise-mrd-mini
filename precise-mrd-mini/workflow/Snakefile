@@ -1,0 +1,56 @@
+configfile: "../data/synthetic_config.yaml"
+
+rule simulate:
+    input:
+        config="../data/synthetic_config.yaml"
+    output:
+        variants="../data/ground_truth/variants.csv",
+        reads="../simulated_reads/reads.parquet"
+    shell:
+        "python -m mrd.simulate {input.config} --output-reads {output.reads} --variants-csv {output.variants}"
+
+rule collapse_umis:
+    input:
+        reads=rules.simulate.output.reads
+    output:
+        families="../tmp/families.parquet",
+        collapsed="../tmp/collapsed.parquet"
+    shell:
+        "python -m mrd.umi {input.reads} --output-family {output.families} --output-locus {output.collapsed}"
+
+rule error_model:
+    input:
+        collapsed=rules.collapse_umis.output.collapsed
+    output:
+        params="../tmp/error_model.parquet"
+    shell:
+        "python -m mrd.error_model {input.collapsed} --output-path {output.params}"
+
+rule mrd_call:
+    input:
+        collapsed=rules.collapse_umis.output.collapsed,
+        params=rules.error_model.output.params
+    output:
+        calls="../tmp/mrd_calls.csv",
+        summary="../tmp/mrd_summary.json"
+    shell:
+        "python -m mrd.mrd_call {input.collapsed} {input.params} --output-path {output.calls} --summary-path {output.summary}"
+
+rule report:
+    input:
+        variants=rules.simulate.output.variants,
+        collapsed=rules.collapse_umis.output.collapsed,
+        families=rules.collapse_umis.output.families,
+        calls=rules.mrd_call.output.calls,
+        params=rules.error_model.output.params,
+        summary=rules.mrd_call.output.summary
+    output:
+        markdown="../reports/auto_report.md",
+        html="../reports/auto_report.html"
+    shell:
+        "python -m mrd.report {input.variants} {input.collapsed} {input.families} {input.calls} {input.params} {input.summary} --output-markdown {output.markdown} --output-html {output.html}"
+
+rule all:
+    input:
+        rules.report.output.markdown,
+        rules.report.output.html

@@ -1,0 +1,19 @@
+# MRD Auto Report
+
+## Methods
+This run uses a beta-binomial error model with UMIs.
+
+## QC Summary
+{{ qc | tojson }}
+
+## MRD Calls
+Positives: {{ positives }} of {{ total_variants }} variants (z={{ stouffer_z|round(2) }}).
+
+## Figures
+![Family sizes]({{ figures.family.as_posix() }})
+![Error violin]({{ figures.error_violin.as_posix() }})
+![ROC]({{ figures.roc.as_posix() }})
+![PR]({{ figures.pr.as_posix() }})
+
+## Detection Limits
+Results stored in {{ figures.lod.as_posix() }}
