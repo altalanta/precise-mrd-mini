@@ -1,0 +1,28 @@
+[package]
+name = "precise_mrd_ext"
+version = "0.1.0"
+edition = "2021"
+description = "Rust extensions for precise-mrd UMI processing"
+
+[lib]
+name = "precise_mrd_ext"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.19", features = ["extension-module"] }
+rayon = "1.7"
+fnv = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+
+[dependencies.pyo3-stub-gen]
+version = "0.3"
+optional = true
+
+[features]
+default = []
+stub-gen = ["pyo3-stub-gen"]
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"

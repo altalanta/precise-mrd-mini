@@ -1,0 +1,57 @@
+# Default configuration for precise-mrd simulation
+run_id: "default_run"
+seed: 42
+
+# Simulation parameters
+simulation:
+  allele_fractions: [0.05, 0.01, 0.001, 0.0005, 0.0001]
+  umi_depths: [5000, 10000, 20000, 50000]
+  n_replicates: 1000
+  n_bootstrap: 1000
+  
+# UMI consensus parameters  
+umi:
+  min_family_size: 3
+  max_family_size: 1000
+  max_edit_distance: 1
+  quality_threshold: 20
+  consensus_threshold: 0.6
+
+# Background error model
+error_model:
+  contexts: ["ACG", "CCG", "GCG", "TCG", "ACA", "CCA", "GCA", "TCA", 
+            "ACT", "CCT", "GCT", "TCT", "ATG", "CTG", "GTG", "TTG"]
+  base_error_rate: 1e-4
+  contamination_rate: 1e-3
+
+# Statistical testing
+stats:
+  test_type: "poisson"  # or "binomial"
+  alpha: 0.05
+  fdr_method: "benjamini_hochberg"
+  min_alt_umi: 2
+
+# Filtering parameters
+filters:
+  strand_bias_threshold: 0.01
+  end_repair_filter: true
+  end_repair_distance: 10
+  end_repair_contexts: ["G>T", "C>A"]
+
+# LoD/LoB estimation
+lod:
+  detection_threshold: 0.95
+  confidence_level: 0.95
+  lob_replicates: 10000
+
+# QC thresholds
+qc:
+  min_total_umi_families: 1000
+  max_contamination_rate: 0.05
+  min_depth_per_locus: 100
+
+# Output settings
+output:
+  save_intermediate: true
+  compression: "gzip"
+  decimal_places: 6
