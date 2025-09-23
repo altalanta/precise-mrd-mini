@@ -1,0 +1,34 @@
+# Report generation configuration
+report:
+  title: "Precise MRD Analysis Report"
+  template: "template.qmd"
+  output_format: "html"
+  
+# Figure settings
+figures:
+  dpi: 300
+  format: "png"
+  style: "seaborn-v0_8"
+  figsize: [12, 8]
+  
+# Tables
+tables:
+  max_rows: 50
+  precision: 6
+  
+# Report sections
+sections:
+  - summary
+  - lob_analysis
+  - lod_analysis
+  - context_analysis
+  - qc_metrics
+  - filtering_impact
+  - performance
+  
+# Styling
+style:
+  primary_color: "#2E86AB"
+  secondary_color: "#A23B72"
+  background_color: "#F18F01"
+  text_color: "#333333"

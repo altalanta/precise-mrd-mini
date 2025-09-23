@@ -1,0 +1,56 @@
+# Small/fast configuration for CI testing
+run_id: "ci_small"
+seed: 42
+
+# Simulation parameters - reduced for speed
+simulation:
+  allele_fractions: [0.01, 0.001]  # Only 2 AFs for CI
+  umi_depths: [5000, 10000]        # Only 2 depths for CI
+  n_replicates: 100                # Reduced replicates
+  n_bootstrap: 100                 # Reduced bootstrap
+  
+# UMI consensus parameters  
+umi:
+  min_family_size: 3
+  max_family_size: 1000
+  max_edit_distance: 1
+  quality_threshold: 20
+  consensus_threshold: 0.6
+
+# Background error model
+error_model:
+  contexts: ["ACG", "CCG", "GCG", "TCG"]  # Reduced contexts for speed
+  base_error_rate: 1e-4
+  contamination_rate: 1e-3
+
+# Statistical testing
+stats:
+  test_type: "poisson"
+  alpha: 0.05
+  fdr_method: "benjamini_hochberg"
+  min_alt_umi: 2
+
+# Filtering parameters
+filters:
+  strand_bias_threshold: 0.01
+  end_repair_filter: true
+  end_repair_distance: 10
+  end_repair_contexts: ["G>T", "C>A"]
+
+# LoD/LoB estimation
+lod:
+  detection_threshold: 0.95
+  confidence_level: 0.95
+  lob_replicates: 1000  # Reduced for CI
+
+# QC thresholds
+qc:
+  min_total_umi_families: 1000
+  max_contamination_rate: 0.05
+  min_depth_per_locus: 100
+
+# Output settings
+output:
+  save_intermediate: false  # Skip intermediate files for CI
+  compression: "gzip"
+  decimal_places: 6
