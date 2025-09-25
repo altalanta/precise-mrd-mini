@@ -11,6 +11,8 @@ This module provides:
 import click
 import yaml
 import logging
+import numpy as np
+import random
 from pathlib import Path
 from datetime import datetime
 from typing import Optional, Dict, Any
@@ -37,13 +39,22 @@ def setup_logging(verbose: bool = False) -> None:
 
 
 @click.group()
+@click.option('--seed', default=42, help='Global random seed for reproducibility')
 @click.option('--verbose', '-v', is_flag=True, help='Enable verbose logging')
 @click.pass_context
-def main(ctx: click.Context, verbose: bool) -> None:
+def main(ctx: click.Context, seed: int, verbose: bool) -> None:
     """Precise MRD: ctDNA/UMI toy MRD pipeline."""
     ctx.ensure_object(dict)
+    ctx.obj['seed'] = seed
     ctx.obj['verbose'] = verbose
+    
+    # Set global seeds for reproducibility
+    np.random.seed(seed)
+    random.seed(seed)
+    
     setup_logging(verbose)
+    if verbose:
+        logging.info(f"Global random seed set to {seed}")
 
 
 @main.command()

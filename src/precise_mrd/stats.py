@@ -76,8 +76,9 @@ class StatisticalTester:
         else:
             raise ValueError("alternative must be 'greater', 'less', or 'two-sided'")
         
-        # Calculate effect size (rate ratio)
-        effect_size = observed / expected if expected > 0 else float('inf')
+        # Calculate effect size (log rate ratio for numerical stability)
+        effect_size = (np.log(observed + 1e-8) - np.log(expected + 1e-8) 
+                      if expected > 1e-12 else np.nan)
         
         return TestResult(
             statistic=observed,
@@ -112,12 +113,15 @@ class StatisticalTester:
             alternative=alternative
         )
         
-        # Calculate effect size (odds ratio)
+        # Calculate effect size (log odds ratio for numerical stability)
         observed_prob = successes / trials
-        if expected_prob > 0 and expected_prob < 1:
-            odds_ratio = (observed_prob / (1 - observed_prob)) / (expected_prob / (1 - expected_prob))
+        if expected_prob > 1e-12 and expected_prob < (1 - 1e-12):
+            # Use log odds ratio for numerical stability
+            observed_logit = np.log(observed_prob + 1e-12) - np.log(1 - observed_prob + 1e-12)
+            expected_logit = np.log(expected_prob + 1e-12) - np.log(1 - expected_prob + 1e-12)
+            odds_ratio = observed_logit - expected_logit
         else:
-            odds_ratio = float('inf') if observed_prob > expected_prob else 0.0
+            odds_ratio = np.clip(observed_prob / (expected_prob + 1e-12), 1e-12, 1e12)
         
         return TestResult(
             statistic=result.statistic,

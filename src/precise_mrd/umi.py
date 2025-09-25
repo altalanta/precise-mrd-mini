@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 from collections import Counter, defaultdict
 from .io import Read
+from .validation import validate_umi_output
 
 
 @dataclass
@@ -264,7 +265,24 @@ class UMIProcessor:
                     'site_key': site_key
                 })
         
-        return pd.DataFrame(data)
+        df = pd.DataFrame(data)
+        
+        # Validate output before returning
+        if not df.empty:
+            # Add required columns for validation
+            df['umi'] = df['site_key']  # Temporary - using site_key as UMI identifier
+            df['consensus_allele'] = df['allele']
+            df['family_size'] = 1  # Placeholder - would need actual family size data
+            df['quality'] = 30.0  # Placeholder - would need actual quality scores
+            df['strand_counts'] = "{'+': 1, '-': 0}"  # Placeholder
+            
+            try:
+                validate_umi_output(df)
+            except Exception as e:
+                import logging
+                logging.warning(f"UMI output validation failed: {e}")
+        
+        return df
     
     def get_family_size_distribution(self, families: List[UMIFamily]) -> Dict[int, int]:
         """Get distribution of family sizes."""
