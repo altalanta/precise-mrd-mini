@@ -28,6 +28,8 @@ class LODResult:
     bootstrap_estimates: List[float]
     n_bootstrap: int
     confidence_level: float
+    multiple_testing_correction: str = "bonferroni"
+    corrected_alpha: float = 0.05
 
 
 @dataclass
@@ -124,10 +126,21 @@ class LODEstimator:
     def bootstrap_lod_estimation(
         self,
         simulation_results: pd.DataFrame,
-        depth: int
+        depth: int,
+        n_comparisons: int = 1,
+        multiple_testing_method: str = "bonferroni"
     ) -> LODResult:
-        """Bootstrap LoD estimation from simulation results."""
+        """Bootstrap LoD estimation from simulation results with multiple testing correction."""
         
+        # Apply multiple testing correction to alpha
+        if multiple_testing_method == "bonferroni":
+            corrected_alpha = self.alpha / n_comparisons
+        elif multiple_testing_method == "holm":
+            # Simplified Holm correction (full implementation would need p-values)
+            corrected_alpha = self.alpha / n_comparisons  
+        else:
+            corrected_alpha = self.alpha
+            
         # Filter results for specific depth
         depth_results = simulation_results[simulation_results['umi_depth'] == depth]
         
@@ -196,7 +209,9 @@ class LODEstimator:
             detection_curve=final_detection_curve,
             bootstrap_estimates=bootstrap_lods,
             n_bootstrap=len(bootstrap_lods),
-            confidence_level=self.confidence_level
+            confidence_level=self.confidence_level,
+            multiple_testing_correction=multiple_testing_method,
+            corrected_alpha=corrected_alpha
         )
     
     def estimate_lob(

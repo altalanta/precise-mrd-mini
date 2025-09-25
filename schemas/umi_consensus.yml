@@ -1,0 +1,33 @@
+# Schema for UMI consensus output validation
+required_columns:
+  - umi
+  - consensus_allele
+  - family_size
+  - quality
+  - site_key
+  - strand_counts
+
+column_types:
+  umi: string
+  consensus_allele: string
+  family_size: integer
+  quality: float
+  site_key: string
+
+constraints:
+  family_size:
+    min: 1
+    max: 10000
+  quality:
+    min: 0.0
+    max: 100.0
+  consensus_allele:
+    allowed_values: ["A", "T", "G", "C", "N"]
+
+validation_rules:
+  - name: "no_empty_umi"
+    check: "umi is not null and umi != ''"
+  - name: "positive_family_size"
+    check: "family_size > 0"
+  - name: "valid_quality_range"
+    check: "quality >= 0 and quality <= 100"
