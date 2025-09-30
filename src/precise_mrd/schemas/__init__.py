@@ -1,5 +1,4 @@
-
-"""Schema validators for pipeline artifacts.""""
+"""Schema validators for pipeline artifacts."""
 
 from __future__ import annotations
 
@@ -15,7 +14,7 @@ class Schema:
 
     def validate(self, frame: pd.DataFrame) -> None:
         try:
-            pl.DataFrame(frame).select(pl.all().cast(self.schema))
+            pl.DataFrame(frame).cast(self.schema)
         except Exception as exc:  # pragma: no cover - polars details vary
             msg = f"{self.name} schema validation failed: {exc}"
             raise ValueError(msg) from exc
@@ -83,5 +82,3 @@ MRD_CALL_SCHEMA = Schema(
         }
     ),
 )
-
-

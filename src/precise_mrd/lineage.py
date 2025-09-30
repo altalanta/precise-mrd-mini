@@ -1,5 +1,4 @@
-
-"""Lineage tracking utilities.""""
+"""Lineage tracking utilities."""
 
 from __future__ import annotations
 
@@ -10,7 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .utils import environment_snapshot, git_sha
+from . import utils as utils_mod
 
 
 @dataclass(slots=True)
@@ -22,7 +21,7 @@ class LineageRecord:
 
 
 class LineageWriter:
-    """Persist lineage information for reproducibility.""""
+    """Persist lineage information for reproducibility."""
 
     def __init__(self, path: Path) -> None:
         self.path = path
@@ -31,9 +30,9 @@ class LineageWriter:
             self.payload = json.loads(self.path.read_text(encoding="utf-8"))
         else:
             self.payload = {
-                "git_sha": git_sha(),
+                "git_sha": utils_mod.git_sha(),
                 "platform": platform.platform(),
-                "environment": environment_snapshot(),
+                "environment": utils_mod.environment_snapshot(),
                 "records": [],
             }
 
@@ -49,5 +48,3 @@ def lineage_record(run_id: str, stage: str, params: dict[str, Any]) -> LineageRe
         params=params,
         timestamp=datetime.now(timezone.utc).isoformat(),
     )
-
-
