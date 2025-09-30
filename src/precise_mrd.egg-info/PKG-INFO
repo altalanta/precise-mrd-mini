@@ -1,3 +1,36 @@
+Metadata-Version: 2.4
+Name: precise-mrd
+Version: 0.1.0
+Summary: ctDNA/UMI toy MRD pipeline with UMI-aware error modeling and LoB/LoD estimation
+Author-email: Precise MRD Team <team@precise-mrd.org>
+License: MIT
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: numpy>=1.24.0
+Requires-Dist: pandas>=2.0.0
+Requires-Dist: scipy>=1.10.0
+Requires-Dist: statsmodels>=0.14.0
+Requires-Dist: matplotlib>=3.7.0
+Requires-Dist: seaborn>=0.12.0
+Requires-Dist: pyyaml>=6.0
+Requires-Dist: jinja2>=3.1.0
+Requires-Dist: click>=8.1.0
+Requires-Dist: tqdm>=4.65.0
+Requires-Dist: scikit-learn>=1.3.0
+Provides-Extra: dev
+Requires-Dist: pytest>=7.4.0; extra == "dev"
+Requires-Dist: pytest-cov>=4.1.0; extra == "dev"
+Requires-Dist: black>=23.0.0; extra == "dev"
+Requires-Dist: isort>=5.12.0; extra == "dev"
+Requires-Dist: flake8>=6.0.0; extra == "dev"
+Requires-Dist: mypy>=1.5.0; extra == "dev"
+Requires-Dist: pre-commit>=3.3.0; extra == "dev"
+Requires-Dist: coverage-badge>=1.1.0; extra == "dev"
+Provides-Extra: rust
+Requires-Dist: maturin>=1.0.0; extra == "rust"
+Dynamic: license-file
+
 # Precise MRD
 
 [![CI](https://github.com/user/precise-mrd-mini/workflows/CI/badge.svg)](https://github.com/user/precise-mrd-mini/actions)
@@ -39,40 +72,17 @@ A ctDNA/UMI toy MRD pipeline with UMI-aware error modeling, LoB/LoD estimation, 
 - LoD heatmaps and detection curves
 - QC metrics and performance summaries
 
-## Quickstart
+## Quick Start
 
-**3-command demo** (deterministic, CPU-only, <5 minutes):
-
-```bash
-make setup     # Install dependencies and package in editable mode
-make smoke     # Run fast end-to-end pipeline with synthetic data
-```
-
-The smoke test runs a complete MRD pipeline with minimal synthetic data, producing `reports/metrics.json` and `reports/auto_report.html` with ROC/PR curves and detection metrics.
-
-### Docker
+### Installation
 
 ```bash
-docker build -t precise-mrd-mini:cpu -f Dockerfile.cpu .
-docker run --rm -v $PWD/reports:/app/reports precise-mrd-mini:cpu
+git clone https://github.com/user/precise-mrd-mini.git
+cd precise-mrd-mini
+make setup
 ```
 
-## Determinism & Reproducibility
-
-All pipeline stages use **fixed seeds** to ensure reproducible results:
-- Smoke test uses `seed=7` by default
-- Golden hash testing validates first 10 variant scores remain stable
-- Artifacts include `run_context.json` with seed, timestamp, and full configuration
-- Test suite includes determinism checks with SHA256 validation
-
-## Artifact Contract
-
-The smoke path produces:
-- `reports/metrics.json` - ROC AUC, PR AUC, detection stats with 95% CI
-- `reports/auto_report.html` - Interactive HTML report with plots
-- `reports/run_context.json` - Complete reproducibility metadata
-
-## Full Pipeline (Snakemake)
+### Basic Usage
 
 ```bash
 # Run simulation with default parameters

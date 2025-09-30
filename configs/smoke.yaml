@@ -1,0 +1,61 @@
+# Ultra-fast smoke test configuration
+run_id: "smoke"
+seed: 7
+
+# Minimal simulation parameters for speed
+simulation:
+  allele_fractions: [0.005]  # Single AF
+  umi_depths: [1000]         # Single depth
+  n_replicates: 50           # Minimal replicates
+  n_bootstrap: 50            # Minimal bootstrap
+  
+# UMI consensus parameters  
+umi:
+  min_family_size: 2
+  max_family_size: 100
+  max_edit_distance: 1
+  quality_threshold: 20
+  consensus_threshold: 0.6
+
+# Background error model
+error_model:
+  contexts: ["ACG", "CCG"]  # Only 2 contexts for speed
+  base_error_rate: 1e-4
+  contamination_rate: 1e-3
+
+# Statistical testing
+stats:
+  test_type: "poisson"
+  alpha: 0.05
+  fdr_method: "benjamini_hochberg"
+  min_alt_umi: 1
+
+# Filtering parameters
+filters:
+  strand_bias_threshold: 0.01
+  end_repair_filter: true
+  end_repair_distance: 10
+  end_repair_contexts: ["G>T", "C>A"]
+
+# LoD/LoB estimation
+lod:
+  detection_threshold: 0.95
+  confidence_level: 0.95
+  lob_replicates: 100  # Minimal for smoke test
+
+# QC thresholds
+qc:
+  min_total_umi_families: 10
+  max_contamination_rate: 0.1
+  min_depth_per_locus: 10
+
+# Reporting settings
+report:
+  include_plots: true
+  template: null
+
+# Output settings
+output:
+  save_intermediate: true
+  compression: "gzip"
+  decimal_places: 6

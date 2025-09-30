@@ -50,7 +50,9 @@ def simulate(
     seed: int = typer.Option(42, "--seed", help="Global random seed"),
     out: Path = typer.Option(Path("artifacts"), "--out", help="Artifact directory"),
     threads: int = typer.Option(1, "--threads", help="Reserved for Snakemake integration"),
-    randomize: bool = typer.Option(False, "--randomize", help="Append timestamp to output directory"),
+    randomize: bool = typer.Option(
+        False, "--randomize", help="Append timestamp to output directory"
+    ),
 ) -> None:
     _ = threads  # threads currently unused but kept for interface parity
     cfg = _load_config(config)
@@ -65,12 +67,14 @@ def simulate(
     lineage = LineageWriter(io.path("lineage"))
     lineage.append(lineage_record(cfg.run_id, "simulate", {"seed": seed}))
 
-    _emit({
-        "stage": "simulate",
-        "output_dir": str(out_dir),
-        "artifacts": {"reads": str(path)},
-        "config": dump_config(cfg),
-    })
+    _emit(
+        {
+            "stage": "simulate",
+            "output_dir": str(out_dir),
+            "artifacts": {"reads": str(path)},
+            "config": dump_config(cfg),
+        }
+    )
 
 
 @app.command()
@@ -79,7 +83,9 @@ def collapse(
     seed: int = typer.Option(42, "--seed", help="Global random seed"),
     out: Path = typer.Option(Path("artifacts"), "--out", help="Artifact directory"),
     threads: int = typer.Option(1, "--threads", help="Reserved for Snakemake integration"),
-    randomize: bool = typer.Option(False, "--randomize", help="Append timestamp to output directory"),
+    randomize: bool = typer.Option(
+        False, "--randomize", help="Append timestamp to output directory"
+    ),
 ) -> None:
     _ = seed, threads, randomize
     cfg = _load_config(config)
@@ -106,7 +112,9 @@ def error_model(
     seed: int = typer.Option(42, "--seed", help="Global random seed"),
     out: Path = typer.Option(Path("artifacts"), "--out", help="Artifact directory"),
     threads: int = typer.Option(1, "--threads", help="Reserved for Snakemake integration"),
-    randomize: bool = typer.Option(False, "--randomize", help="Append timestamp to output directory"),
+    randomize: bool = typer.Option(
+        False, "--randomize", help="Append timestamp to output directory"
+    ),
 ) -> None:
     _ = seed, threads, randomize
     cfg = _load_config(config)
@@ -133,7 +141,9 @@ def call(
     seed: int = typer.Option(42, "--seed", help="Global random seed"),
     out: Path = typer.Option(Path("artifacts"), "--out", help="Artifact directory"),
     threads: int = typer.Option(1, "--threads", help="Reserved for Snakemake integration"),
-    randomize: bool = typer.Option(False, "--randomize", help="Append timestamp to output directory"),
+    randomize: bool = typer.Option(
+        False, "--randomize", help="Append timestamp to output directory"
+    ),
 ) -> None:
     _ = threads, randomize
     cfg = _load_config(config)
@@ -152,15 +162,17 @@ def call(
     lineage = LineageWriter(io.path("lineage"))
     lineage.append(lineage_record(cfg.run_id, "call", {"seed": seed}))
 
-    _emit({
-        "stage": "call",
-        "artifacts": {
-            "calls": str(call_path),
-            "lod_grid": str(lod_path),
-            "metrics": str(metrics_path),
-        },
-        "metrics": metrics_payload,
-    })
+    _emit(
+        {
+            "stage": "call",
+            "artifacts": {
+                "calls": str(call_path),
+                "lod_grid": str(lod_path),
+                "metrics": str(metrics_path),
+            },
+            "metrics": metrics_payload,
+        }
+    )
 
 
 @app.command()
@@ -169,7 +181,9 @@ def report(
     seed: int = typer.Option(42, "--seed", help="Global random seed"),
     out: Path = typer.Option(Path("artifacts"), "--out", help="Artifact directory"),
     threads: int = typer.Option(1, "--threads", help="Reserved for Snakemake integration"),
-    randomize: bool = typer.Option(False, "--randomize", help="Append timestamp to output directory"),
+    randomize: bool = typer.Option(
+        False, "--randomize", help="Append timestamp to output directory"
+    ),
 ) -> None:
     _ = seed, threads, randomize
     cfg = _load_config(config)
@@ -188,27 +202,39 @@ def report(
     plot_artifacts = {}
     if cfg.report.include_plots:
         plot_artifacts = render_plots(calls, out_dir)
-    md_path, html_path = render_report(metrics, lod, out_dir, cfg.report.template and Path(cfg.report.template))
+    md_path, html_path = render_report(
+        metrics, lod, out_dir, cfg.report.template and Path(cfg.report.template)
+    )
 
     lineage = LineageWriter(io.path("lineage"))
     lineage.append(lineage_record(cfg.run_id, "report", {}))
 
     artifacts = {"markdown": str(md_path), "html": str(html_path)}
     artifacts.update(plot_artifacts)
-    _emit({
-        "stage": "report",
-        "artifacts": artifacts,
-    })
+    _emit(
+        {
+            "stage": "report",
+            "artifacts": artifacts,
+        }
+    )
 
 
 @app.command()
 def smoke(
     config: Path = typer.Option(None, "--config", help="Pipeline configuration YAML"),
-    seed: int = typer.Option(42, "--seed", help="Global random seed"),
+    seed: int = typer.Option(7, "--seed", help="Global random seed"),
     out: Path = typer.Option(Path("artifacts"), "--out", help="Artifact directory"),
     threads: int = typer.Option(1, "--threads", help="Reserved for Snakemake integration"),
-    randomize: bool = typer.Option(False, "--randomize", help="Append timestamp to output directory"),
+    randomize: bool = typer.Option(
+        False, "--randomize", help="Append timestamp to output directory"
+    ),
 ) -> None:
+    from .determinism_utils import set_all_seeds
+    import numpy as np
+
+    # Set deterministic seeds for reproducibility
+    set_all_seeds(seed)
+
     cfg = _load_config(config)
     out_dir = _prepare_output(out, cfg, randomize)
     io = PipelineIO(out_dir)
@@ -229,21 +255,42 @@ def smoke(
     io.write_parquet("lod_grid", lod)
     io.write_json("metrics", metrics_payload)
 
+    # Save first 10 variant scores for determinism testing
+    scores = 1.0 - calls["pvalue"].head(10).to_numpy()
+    smoke_scores_path = out_dir / "smoke_scores.npy"
+    np.save(smoke_scores_path, scores)
+
+    # Save run context for reproducibility
+    context = {
+        "seed": seed,
+        "timestamp": datetime.utcnow().isoformat(),
+        "config": dump_config(cfg),
+        "parameters": {
+            "threads": threads,
+            "randomize": randomize,
+        },
+    }
+    io.write_json("run_context", context)
+
     render_report(metrics_payload, lod, out_dir, cfg.report.template and Path(cfg.report.template))
 
     lineage = LineageWriter(io.path("lineage"))
     lineage.append(lineage_record(cfg.run_id, "smoke", {"seed": seed}))
 
-    _emit({
-        "stage": "smoke",
-        "output_dir": str(out_dir),
-        "artifacts": {
-            key: str(out_dir / filename)
-            for key, filename in ARTIFACT_FILENAMES.items()
-            if (out_dir / filename).exists()
-        },
-        "metrics": metrics_payload,
-    })
+    _emit(
+        {
+            "stage": "smoke",
+            "output_dir": str(out_dir),
+            "artifacts": {
+                key: str(out_dir / filename)
+                for key, filename in ARTIFACT_FILENAMES.items()
+                if (out_dir / filename).exists()
+            },
+            "metrics": metrics_payload,
+            "smoke_scores": str(smoke_scores_path),
+            "run_context": str(io.path("run_context")),
+        }
+    )
 
 
 if __name__ == "__main__":  # pragma: no cover - CLI entry point

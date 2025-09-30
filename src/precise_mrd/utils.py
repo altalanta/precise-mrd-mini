@@ -24,6 +24,7 @@ ARTIFACT_FILENAMES = {
     "roc_png": "roc_curve.png",
     "pr_png": "pr_curve.png",
     "config": "config.json",
+    "run_context": "run_context.json",
 }
 
 

@@ -1,0 +1,93 @@
+<h1>MRD Pipeline Report</h1>
+<h2>Summary Metrics</h2>
+<ul>
+<li>ROC AUC: 0.2181</li>
+<li>Average Precision: 0.5674</li>
+<li>Brier Score: 0.6435</li>
+<li>Detected Cases: 6 / 12</li>
+</ul>
+<h2>Calibration</h2>
+<table>
+<thead>
+<tr>
+<th>Bin</th>
+<th>Lower</th>
+<th>Upper</th>
+<th>Count</th>
+<th>Event Rate</th>
+<th>Confidence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>| 0 | 0.0 | 0.1 | 844 | 0.659 | 0.0 |</p>
+<p>| 9 | 0.9 | 1.0 | 20 | 1.0 | 0.99 |</p>
+<h2>Limit of Detection Grid</h2>
+<table>
+<thead>
+<tr>
+<th>Variant</th>
+<th>Depth</th>
+<th>Allele Fraction</th>
+<th>Detection Rate</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>| VAR01 | 1000 | 0.0 | 0.0 |</p>
+<p>| VAR01 | 1000 | 0.005 | 0.035 |</p>
+<h2>Raw Metrics JSON</h2>
+<pre><code class="language-json">{
+  &quot;roc_auc&quot;: 0.21806278935185186,
+  &quot;roc_auc_ci&quot;: {
+    &quot;mean&quot;: 0.5173959679526267,
+    &quot;lower&quot;: 0.4751539730825155,
+    &quot;upper&quot;: 0.5550629825764841,
+    &quot;std&quot;: 0.021360191245833774
+  },
+  &quot;average_precision&quot;: 0.5673776510226742,
+  &quot;average_precision_ci&quot;: {
+    &quot;mean&quot;: 0.6998969247095808,
+    &quot;lower&quot;: 0.6553719770623939,
+    &quot;upper&quot;: 0.7413075663108967,
+    &quot;std&quot;: 0.021013521276859536
+  },
+  &quot;brier_score&quot;: 0.6435210764098248,
+  &quot;detected_cases&quot;: 6,
+  &quot;total_cases&quot;: 12,
+  &quot;calibration&quot;: [
+    {
+      &quot;bin&quot;: 0,
+      &quot;lower&quot;: 0.0,
+      &quot;upper&quot;: 0.1,
+      &quot;count&quot;: 844,
+      &quot;event_rate&quot;: 0.6587677725118484,
+      &quot;confidence&quot;: 1.0000000000000003e-09
+    },
+    {
+      &quot;bin&quot;: 9,
+      &quot;lower&quot;: 0.9,
+      &quot;upper&quot;: 1.0,
+      &quot;count&quot;: 20,
+      &quot;event_rate&quot;: 1.0,
+      &quot;confidence&quot;: 0.9896117714538825
+    }
+  ]
+}
+</code></pre>
