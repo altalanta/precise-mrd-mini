@@ -19,6 +19,7 @@ from .reporting import render_plots, render_report
 from .rng import choose_rng
 from .simulate import simulate_reads
 from .utils import ARTIFACT_FILENAMES, PipelineIO, as_json_ready, ensure_directory
+from . import __version__
 
 app = typer.Typer(help="Deterministic MRD mini-pipeline")
 
@@ -293,5 +294,233 @@ def smoke(
     )
 
 
-if __name__ == "__main__":  # pragma: no cover - CLI entry point
+@app.command("init-config")
+def init_config(
+    output: Path = typer.Option(
+        Path("configs/custom.yaml"), 
+        "--output", 
+        help="Output path for configuration file"
+    ),
+    template: str = typer.Option(
+        "default", 
+        "--template", 
+        help="Configuration template (default, small, large)"
+    ),
+) -> None:
+    """Initialize a new configuration file from template."""
+    from .config import create_default_config
+    
+    config = create_default_config(template)
+    
+    # Ensure output directory exists
+    output.parent.mkdir(parents=True, exist_ok=True)
+    
+    # Write configuration
+    with open(output, "w", encoding="utf-8") as f:
+        import yaml
+        yaml.dump(dump_config(config), f, default_flow_style=False, sort_keys=False)
+    
+    _emit({
+        "stage": "init-config",
+        "template": template,
+        "output_file": str(output),
+        "config": dump_config(config),
+    })
+
+
+@app.command()
+def validate(
+    config: Path = typer.Option(None, "--config", help="Pipeline configuration YAML"),
+    results: Path = typer.Option(
+        Path("artifacts"), "--results", help="Results directory to validate"
+    ),
+    json_output: bool = typer.Option(False, "--json", help="Output in JSON format"),
+) -> None:
+    """Validate pipeline results and configuration."""
+    from .validation import validate_results, validate_config
+    
+    validation_results = {"config": None, "results": None, "overall": "UNKNOWN"}
+    
+    # Validate configuration if provided
+    if config:
+        try:
+            cfg = _load_config(config)
+            config_validation = validate_config(cfg)
+            validation_results["config"] = config_validation
+        except Exception as e:
+            validation_results["config"] = {"status": "FAILED", "error": str(e)}
+    
+    # Validate results if directory exists
+    if results.exists():
+        try:
+            results_validation = validate_results(results)
+            validation_results["results"] = results_validation
+        except Exception as e:
+            validation_results["results"] = {"status": "FAILED", "error": str(e)}
+    
+    # Determine overall status
+    statuses = [v.get("status", "UNKNOWN") for v in validation_results.values() if v and isinstance(v, dict)]
+    if all(s == "PASSED" for s in statuses):
+        validation_results["overall"] = "PASSED"
+    elif any(s == "FAILED" for s in statuses):
+        validation_results["overall"] = "FAILED"
+    else:
+        validation_results["overall"] = "WARNING"
+    
+    if json_output:
+        _emit(validation_results)
+    else:
+        # Human-readable output
+        status_color = {
+            "PASSED": typer.colors.GREEN,
+            "FAILED": typer.colors.RED,
+            "WARNING": typer.colors.YELLOW,
+            "UNKNOWN": typer.colors.BLUE,
+        }
+        
+        typer.echo(f"Validation Results:")
+        typer.echo(f"Overall: ", nl=False)
+        typer.secho(
+            validation_results["overall"], 
+            fg=status_color[validation_results["overall"]]
+        )
+        
+        for component, result in validation_results.items():
+            if component != "overall" and result:
+                typer.echo(f"  {component}: ", nl=False)
+                typer.secho(result["status"], fg=status_color[result["status"]])
+                if "error" in result:
+                    typer.echo(f"    Error: {result['error']}")
+
+
+@app.command()
+def benchmark(
+    config: Path = typer.Option(None, "--config", help="Pipeline configuration YAML"),
+    n_runs: int = typer.Option(3, "--n-runs", help="Number of benchmark runs"),
+    json_output: bool = typer.Option(False, "--json", help="Output in JSON format"),
+) -> None:
+    """Run performance benchmarks."""
+    import time
+    from statistics import mean, stdev
+    
+    cfg = _load_config(config)
+    
+    # Ensure we use a small configuration for benchmarking
+    cfg.simulation.n_replicates = min(cfg.simulation.n_replicates, 100)
+    cfg.simulation.n_bootstrap = min(cfg.simulation.n_bootstrap, 100)
+    
+    times = {"simulate": [], "collapse": [], "error_model": [], "call": [], "total": []}
+    
+    for run in range(n_runs):
+        if not json_output:
+            typer.echo(f"Benchmark run {run + 1}/{n_runs}...")
+        
+        total_start = time.time()
+        
+        # Simulate
+        start = time.time()
+        rng = choose_rng(42 + run)
+        simulated = simulate_reads(cfg, rng)
+        times["simulate"].append(time.time() - start)
+        
+        # Collapse
+        start = time.time()
+        collapsed = collapse_umis(simulated.reads, cfg)
+        times["collapse"].append(time.time() - start)
+        
+        # Error model
+        start = time.time()
+        error_df = fit_error_model(collapsed, cfg)
+        times["error_model"].append(time.time() - start)
+        
+        # Call
+        start = time.time()
+        call_mrd(collapsed, error_df, cfg, rng)
+        times["call"].append(time.time() - start)
+        
+        times["total"].append(time.time() - total_start)
+    
+    # Calculate statistics
+    results = {}
+    for stage, stage_times in times.items():
+        results[stage] = {
+            "mean": mean(stage_times),
+            "std": stdev(stage_times) if len(stage_times) > 1 else 0.0,
+            "min": min(stage_times),
+            "max": max(stage_times),
+            "runs": stage_times,
+        }
+    
+    benchmark_summary = {
+        "stage": "benchmark",
+        "n_runs": n_runs,
+        "config_size": "small" if cfg.simulation.n_replicates <= 100 else "full",
+        "timing": results,
+        "passed_60s_budget": results["total"]["max"] < 60.0,
+    }
+    
+    if json_output:
+        _emit(benchmark_summary)
+    else:
+        typer.echo(f"\nBenchmark Results ({n_runs} runs):")
+        typer.echo(f"Configuration: {benchmark_summary['config_size']}")
+        for stage, stats in results.items():
+            typer.echo(f"  {stage:12s}: {stats['mean']:.2f}±{stats['std']:.2f}s "
+                      f"(min: {stats['min']:.2f}s, max: {stats['max']:.2f}s)")
+        
+        if benchmark_summary["passed_60s_budget"]:
+            typer.secho("✓ Passed 60s performance budget", fg=typer.colors.GREEN)
+        else:
+            typer.secho("✗ Failed 60s performance budget", fg=typer.colors.RED)
+
+
+def version_callback(value: bool):
+    """Print version and exit."""
+    if value:
+        typer.echo(f"precise-mrd {__version__}")
+        raise typer.Exit()
+
+
+def deterministic_callback(value: bool):
+    """Print determinism information and exit."""
+    if value:
+        from .determinism_utils import get_git_sha
+        import platform
+        
+        info = {
+            "version": __version__,
+            "git_sha": get_git_sha(),
+            "python_version": platform.python_version(),
+            "platform": platform.platform(),
+            "deterministic_flags": {
+                "PYTHONHASHSEED": "0 (recommended)",
+                "numpy_random_state": "controlled via --seed",
+                "pytorch_deterministic": "set if PyTorch available",
+            }
+        }
+        _emit(info)
+        raise typer.Exit()
+
+
+# Add global options to the main app
+@app.callback()
+def main(
+    version: bool = typer.Option(
+        False, "--version", callback=version_callback, help="Show version and exit"
+    ),
+    deterministic: bool = typer.Option(
+        False, "--deterministic", callback=deterministic_callback, 
+        help="Show determinism configuration and exit"
+    ),
+):
+    """Precise MRD: ctDNA/UMI MRD simulator + caller with deterministic error modeling."""
+    pass
+
+
+def main() -> None:  # pragma: no cover - CLI entry point
+    """Main CLI entry point."""
     app()
+
+
+if __name__ == "__main__":  # pragma: no cover - CLI entry point
+    main()

@@ -1,0 +1,18 @@
+{
+  "git_sha": "7fd5373a604099f4c58f08e9eda64d54ada77295",
+  "platform": "macOS-15.6.1-arm64-arm-64bit",
+  "environment": {
+    "python": "unknown",
+    "cwd": "/Users/artemisfolle/Documents/Coding_Projects/precise-mrd-mini"
+  },
+  "records": [
+    {
+      "run_id": "run",
+      "stage": "smoke",
+      "params": {
+        "seed": 42
+      },
+      "timestamp": "2025-10-02T15:52:56.220109+00:00"
+    }
+  ]
+}

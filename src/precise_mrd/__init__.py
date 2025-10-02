@@ -1,10 +1,45 @@
-"""Precise MRD mini-pipeline."""
+"""Precise MRD: ctDNA/UMI MRD simulator + caller with deterministic error modeling."""
 
 from __future__ import annotations
 
-try:  # pragma: no cover - populated via setuptools-scm at build time
-    from ._version import __version__
-except ImportError:  # pragma: no cover - fallback for editable installs
-    __version__ = "0.0.0"
+__version__ = "0.1.0"
 
-__all__ = ["__version__"]
+# Core simulation and calling functionality
+from .simulate import simulate_reads
+from .collapse import collapse_umis
+from .call import call_mrd
+from .error_model import fit_error_model
+
+# Configuration and I/O
+from .config import PipelineConfig, load_config, dump_config
+from .utils import PipelineIO
+
+# Determinism and reproducibility
+from .determinism_utils import set_all_seeds, get_git_sha, determinism_context
+
+# Reporting
+from .reporting import render_report, render_plots
+from .metrics import roc_auc_score, average_precision
+
+__all__ = [
+    "__version__",
+    # Core pipeline
+    "simulate_reads",
+    "collapse_umis", 
+    "call_mrd",
+    "fit_error_model",
+    # Configuration
+    "PipelineConfig",
+    "load_config",
+    "dump_config",
+    "PipelineIO",
+    # Determinism
+    "set_all_seeds",
+    "get_git_sha", 
+    "determinism_context",
+    # Reporting
+    "render_report",
+    "render_plots",
+    "roc_auc_score",
+    "average_precision",
+]

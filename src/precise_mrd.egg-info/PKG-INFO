@@ -1,10 +1,27 @@
 Metadata-Version: 2.4
 Name: precise-mrd
 Version: 0.1.0
-Summary: ctDNA/UMI toy MRD pipeline with UMI-aware error modeling and LoB/LoD estimation
+Summary: ctDNA/UMI MRD simulator + caller with deterministic error modeling and LoB/LoD estimation
 Author-email: Precise MRD Team <team@precise-mrd.org>
 License: MIT
-Requires-Python: >=3.11
+Project-URL: Homepage, https://github.com/precise-mrd/precise-mrd-mini
+Project-URL: Documentation, https://precise-mrd.github.io/precise-mrd-mini/
+Project-URL: Repository, https://github.com/precise-mrd/precise-mrd-mini
+Project-URL: Issues, https://github.com/precise-mrd/precise-mrd-mini/issues
+Project-URL: Changelog, https://github.com/precise-mrd/precise-mrd-mini/blob/main/CHANGELOG.md
+Keywords: ctdna,mrd,minimal-residual-disease,umi,bioinformatics,cancer-genomics
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Science/Research
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Topic :: Scientific/Engineering :: Bio-Informatics
+Classifier: Topic :: Scientific/Engineering :: Medical Science Apps.
+Classifier: Typing :: Typed
+Requires-Python: >=3.10
 Description-Content-Type: text/markdown
 License-File: LICENSE
 Requires-Dist: numpy>=1.24.0
@@ -15,18 +32,28 @@ Requires-Dist: matplotlib>=3.7.0
 Requires-Dist: seaborn>=0.12.0
 Requires-Dist: pyyaml>=6.0
 Requires-Dist: jinja2>=3.1.0
-Requires-Dist: click>=8.1.0
+Requires-Dist: typer>=0.9.0
 Requires-Dist: tqdm>=4.65.0
 Requires-Dist: scikit-learn>=1.3.0
 Provides-Extra: dev
 Requires-Dist: pytest>=7.4.0; extra == "dev"
 Requires-Dist: pytest-cov>=4.1.0; extra == "dev"
+Requires-Dist: pytest-mock>=3.11.0; extra == "dev"
+Requires-Dist: hypothesis>=6.80.0; extra == "dev"
+Requires-Dist: ruff>=0.0.280; extra == "dev"
 Requires-Dist: black>=23.0.0; extra == "dev"
-Requires-Dist: isort>=5.12.0; extra == "dev"
-Requires-Dist: flake8>=6.0.0; extra == "dev"
 Requires-Dist: mypy>=1.5.0; extra == "dev"
 Requires-Dist: pre-commit>=3.3.0; extra == "dev"
 Requires-Dist: coverage-badge>=1.1.0; extra == "dev"
+Requires-Dist: bandit>=1.7.5; extra == "dev"
+Requires-Dist: pip-tools>=7.0.0; extra == "dev"
+Provides-Extra: docs
+Requires-Dist: mkdocs>=1.5.0; extra == "docs"
+Requires-Dist: mkdocs-material>=9.2.0; extra == "docs"
+Requires-Dist: mkdocstrings[python]>=0.23.0; extra == "docs"
+Requires-Dist: mkdocs-gen-files>=0.5.0; extra == "docs"
+Requires-Dist: mkdocs-literate-nav>=0.6.0; extra == "docs"
+Requires-Dist: mkdocs-section-index>=0.3.6; extra == "docs"
 Provides-Extra: rust
 Requires-Dist: maturin>=1.0.0; extra == "rust"
 Dynamic: license-file
@@ -72,17 +99,40 @@ A ctDNA/UMI toy MRD pipeline with UMI-aware error modeling, LoB/LoD estimation, 
 - LoD heatmaps and detection curves
 - QC metrics and performance summaries
 
-## Quick Start
+## Quickstart
 
-### Installation
+**3-command demo** (deterministic, CPU-only, <5 minutes):
 
 ```bash
-git clone https://github.com/user/precise-mrd-mini.git
-cd precise-mrd-mini
-make setup
+make setup     # Install dependencies and package in editable mode
+make smoke     # Run fast end-to-end pipeline with synthetic data
 ```
 
-### Basic Usage
+The smoke test runs a complete MRD pipeline with minimal synthetic data, producing `reports/metrics.json` and `reports/auto_report.html` with ROC/PR curves and detection metrics.
+
+### Docker
+
+```bash
+docker build -t precise-mrd-mini:cpu -f Dockerfile.cpu .
+docker run --rm -v $PWD/reports:/app/reports precise-mrd-mini:cpu
+```
+
+## Determinism & Reproducibility
+
+All pipeline stages use **fixed seeds** to ensure reproducible results:
+- Smoke test uses `seed=7` by default
+- Golden hash testing validates first 10 variant scores remain stable
+- Artifacts include `run_context.json` with seed, timestamp, and full configuration
+- Test suite includes determinism checks with SHA256 validation
+
+## Artifact Contract
+
+The smoke path produces:
+- `reports/metrics.json` - ROC AUC, PR AUC, detection stats with 95% CI
+- `reports/auto_report.html` - Interactive HTML report with plots
+- `reports/run_context.json` - Complete reproducibility metadata
+
+## Full Pipeline (Snakemake)
 
 ```bash
 # Run simulation with default parameters

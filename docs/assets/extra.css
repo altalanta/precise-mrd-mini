@@ -1,0 +1,178 @@
+/* Custom styles for Precise MRD documentation */
+
+/* Code blocks with better syntax highlighting */
+.highlight {
+    border-radius: 6px;
+}
+
+/* Improve table readability */
+table {
+    border-collapse: collapse;
+    margin: 1em 0;
+}
+
+table th,
+table td {
+    padding: 0.5em 1em;
+    border: 1px solid var(--md-default-fg-color--lighter);
+}
+
+/* Command line styling */
+.codehilite .gp {
+    color: var(--md-primary-fg-color);
+    font-weight: bold;
+}
+
+/* Admonition customization */
+.md-typeset .admonition.info {
+    border-color: #0ea5e9;
+}
+
+.md-typeset .admonition.info > .admonition-title {
+    background-color: rgba(14, 165, 233, 0.1);
+}
+
+/* Performance badges */
+.performance-badge {
+    display: inline-block;
+    padding: 0.2em 0.6em;
+    margin: 0.2em;
+    border-radius: 3px;
+    font-size: 0.8em;
+    font-weight: bold;
+}
+
+.performance-badge.fast {
+    background-color: #dcfce7;
+    color: #166534;
+}
+
+.performance-badge.medium {
+    background-color: #fef3c7;
+    color: #92400e;
+}
+
+.performance-badge.slow {
+    background-color: #fee2e2;
+    color: #991b1b;
+}
+
+/* CLI command styling */
+.cli-command {
+    background-color: var(--md-code-bg-color);
+    border: 1px solid var(--md-default-fg-color--lightest);
+    border-radius: 6px;
+    padding: 1em;
+    margin: 1em 0;
+    font-family: var(--md-code-font);
+}
+
+.cli-command .command-name {
+    color: var(--md-primary-fg-color);
+    font-weight: bold;
+}
+
+/* Status indicators */
+.status-indicator {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 0.5em;
+}
+
+.status-indicator.passed {
+    background-color: #22c55e;
+}
+
+.status-indicator.failed {
+    background-color: #ef4444;
+}
+
+.status-indicator.warning {
+    background-color: #f59e0b;
+}
+
+/* Metric cards */
+.metric-card {
+    background: var(--md-default-bg-color);
+    border: 1px solid var(--md-default-fg-color--lightest);
+    border-radius: 8px;
+    padding: 1em;
+    margin: 0.5em;
+    text-align: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.metric-card .metric-value {
+    font-size: 1.5em;
+    font-weight: bold;
+    color: var(--md-primary-fg-color);
+}
+
+.metric-card .metric-label {
+    font-size: 0.9em;
+    color: var(--md-default-fg-color--light);
+    margin-top: 0.2em;
+}
+
+/* Mermaid diagram adjustments */
+.mermaid {
+    text-align: center;
+    margin: 2em 0;
+}
+
+/* File tree styling */
+.file-tree {
+    font-family: var(--md-code-font);
+    background: var(--md-code-bg-color);
+    border-radius: 6px;
+    padding: 1em;
+    margin: 1em 0;
+}
+
+.file-tree .directory {
+    color: var(--md-primary-fg-color);
+    font-weight: bold;
+}
+
+.file-tree .file {
+    color: var(--md-default-fg-color);
+}
+
+/* Configuration example blocks */
+.config-example {
+    background: linear-gradient(135deg, var(--md-code-bg-color), rgba(var(--md-primary-fg-color--rgb), 0.05));
+    border-left: 4px solid var(--md-primary-fg-color);
+    border-radius: 0 6px 6px 0;
+    padding: 1em;
+    margin: 1em 0;
+}
+
+/* Responsive design improvements */
+@media screen and (max-width: 768px) {
+    .metric-card {
+        margin: 0.25em;
+        padding: 0.75em;
+    }
+    
+    .metric-card .metric-value {
+        font-size: 1.2em;
+    }
+}
+
+/* Dark mode adjustments */
+[data-md-color-scheme="slate"] .performance-badge.fast {
+    background-color: rgba(34, 197, 94, 0.2);
+    color: #4ade80;
+}
+
+[data-md-color-scheme="slate"] .performance-badge.medium {
+    background-color: rgba(245, 158, 11, 0.2);
+    color: #fbbf24;
+}
+
+[data-md-color-scheme="slate"] .performance-badge.slow {
+    background-color: rgba(239, 68, 68, 0.2);
+    color: #f87171;
+}
