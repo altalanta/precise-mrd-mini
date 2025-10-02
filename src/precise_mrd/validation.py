@@ -1,209 +1,240 @@
-"""
-Data validation module for pipeline boundary checks.
+"""Validation utilities for pipeline configuration and results."""
 
-This module provides:
-- Schema validation for pipeline outputs
-- Data integrity checks
-- Fail-fast validation at stage boundaries
-"""
+from __future__ import annotations
 
-from typing import Dict, Any, List, Optional
-import pandas as pd
-import numpy as np
-import yaml
+import json
 from pathlib import Path
-from .exceptions import PreciseMRDError
+from typing import Any
+
+import pandas as pd
+
+from .config import PipelineConfig
 
 
-class ValidationError(PreciseMRDError):
-    """Raised when data validation fails."""
-    pass
-
-
-class DataValidator:
-    """Validate data at pipeline boundaries."""
+def validate_config(config: PipelineConfig) -> dict[str, Any]:
+    """Validate pipeline configuration.
     
-    def __init__(self, schemas_dir: Path = None):
-        """Initialize validator with schemas directory."""
-        if schemas_dir is None:
-            schemas_dir = Path(__file__).parent.parent.parent / "schemas"
-        self.schemas_dir = schemas_dir
-        self._schemas = {}
+    Args:
+        config: Pipeline configuration to validate
+        
+    Returns:
+        Validation result dictionary with status and details
+    """
+    issues = []
+    warnings = []
     
-    def load_schema(self, schema_name: str) -> Dict[str, Any]:
-        """Load validation schema from YAML file."""
-        if schema_name not in self._schemas:
-            schema_path = self.schemas_dir / f"{schema_name}.yml"
-            if not schema_path.exists():
-                raise ValidationError(f"Schema file not found: {schema_path}")
-            
-            with open(schema_path, 'r') as f:
-                self._schemas[schema_name] = yaml.safe_load(f)
-        
-        return self._schemas[schema_name]
+    # Check simulation parameters
+    if config.simulation.n_replicates < 10:
+        warnings.append("Very low n_replicates may produce unstable results")
+    if config.simulation.n_replicates > 10000:
+        warnings.append("High n_replicates may be slow")
     
-    def validate_umi_consensus(self, df: pd.DataFrame) -> None:
-        """Validate UMI consensus output data."""
-        schema = self.load_schema("umi_consensus")
+    if config.simulation.n_bootstrap < 100:
+        warnings.append("Low n_bootstrap may produce wide confidence intervals")
+    
+    # Check UMI parameters
+    if config.umi.min_family_size < 1:
+        issues.append("min_family_size must be >= 1")
+    if config.umi.min_family_size > 10:
+        warnings.append("High min_family_size may reduce sensitivity")
+    
+    if not 0.0 <= config.umi.consensus_threshold <= 1.0:
+        issues.append("consensus_threshold must be between 0 and 1")
+    
+    # Check statistical parameters
+    if not 0.0 < config.stats.alpha < 1.0:
+        issues.append("alpha must be between 0 and 1")
+    
+    if config.stats.test_type not in ["poisson", "binomial"]:
+        issues.append(f"Unknown test_type: {config.stats.test_type}")
+    
+    # Check LoD parameters
+    if not 0.0 < config.lod.detection_threshold <= 1.0:
+        issues.append("detection_threshold must be between 0 and 1")
+    
+    if not 0.0 < config.lod.confidence_level <= 1.0:
+        issues.append("confidence_level must be between 0 and 1")
+    
+    # Determine status
+    if issues:
+        status = "FAILED"
+    elif warnings:
+        status = "WARNING"
+    else:
+        status = "PASSED"
+    
+    return {
+        "status": status,
+        "issues": issues,
+        "warnings": warnings,
+        "total_checks": 8,
+        "passed_checks": 8 - len(issues),
+    }
+
+
+def validate_results(results_dir: Path) -> dict[str, Any]:
+    """Validate pipeline results directory.
+    
+    Args:
+        results_dir: Directory containing pipeline results
         
-        # Check required columns
-        required_cols = schema.get("required_columns", [])
-        missing_cols = set(required_cols) - set(df.columns)
-        if missing_cols:
-            raise ValidationError(
-                f"Missing required columns: {missing_cols}",
-                details={"missing_columns": list(missing_cols)}
-            )
-        
-        # Check data types
-        column_types = schema.get("column_types", {})
-        for col, expected_type in column_types.items():
-            if col not in df.columns:
-                continue
-                
-            if expected_type == "integer":
-                if not pd.api.types.is_integer_dtype(df[col]):
-                    raise ValidationError(f"Column '{col}' must be integer type")
-            elif expected_type == "float":
-                if not pd.api.types.is_numeric_dtype(df[col]):
-                    raise ValidationError(f"Column '{col}' must be numeric type")
-            elif expected_type == "string":
-                if not pd.api.types.is_string_dtype(df[col]) and not pd.api.types.is_object_dtype(df[col]):
-                    raise ValidationError(f"Column '{col}' must be string type")
-        
-        # Check constraints
-        constraints = schema.get("constraints", {})
-        for col, constraint_dict in constraints.items():
-            if col not in df.columns:
-                continue
-                
-            col_data = df[col]
-            
-            # Min/max constraints
-            if "min" in constraint_dict:
-                min_val = constraint_dict["min"]
-                if col_data.min() < min_val:
-                    raise ValidationError(
-                        f"Column '{col}' has values below minimum ({min_val})",
-                        details={"min_value": float(col_data.min()), "required_min": min_val}
-                    )
-            
-            if "max" in constraint_dict:
-                max_val = constraint_dict["max"]
-                if col_data.max() > max_val:
-                    raise ValidationError(
-                        f"Column '{col}' has values above maximum ({max_val})",
-                        details={"max_value": float(col_data.max()), "required_max": max_val}
-                    )
-            
-            # Allowed values constraints
-            if "allowed_values" in constraint_dict:
-                allowed = set(constraint_dict["allowed_values"])
-                actual_values = set(col_data.dropna().unique())
-                invalid_values = actual_values - allowed
-                if invalid_values:
-                    raise ValidationError(
-                        f"Column '{col}' contains invalid values: {invalid_values}",
-                        details={"invalid_values": list(invalid_values), "allowed_values": list(allowed)}
-                    )
-        
-        # Custom validation rules
-        rules = schema.get("validation_rules", [])
-        for rule in rules:
-            rule_name = rule.get("name", "unnamed_rule")
-            check_expr = rule.get("check", "")
-            
+    Returns:
+        Validation result dictionary with status and details
+    """
+    issues = []
+    warnings = []
+    found_files = []
+    
+    # Expected files for a complete run
+    expected_files = {
+        "config.json": "Configuration file",
+        "simulate.parquet": "Simulation results",
+        "collapse.parquet": "UMI collapse results",
+        "error_model.parquet": "Error model data",
+        "call.parquet": "Variant calls",
+        "lod_grid.parquet": "LoD grid data",
+        "metrics.json": "Summary metrics",
+        "lineage.jsonl": "Execution lineage",
+    }
+    
+    # Check for expected files
+    for filename, description in expected_files.items():
+        filepath = results_dir / filename
+        if filepath.exists():
+            found_files.append(filename)
+            # Additional validation for specific files
             try:
-                # Simple validation - extend as needed
-                if "family_size > 0" in check_expr:
-                    invalid_mask = df["family_size"] <= 0
-                    if invalid_mask.any():
-                        raise ValidationError(
-                            f"Validation rule '{rule_name}' failed: {invalid_mask.sum()} rows have family_size <= 0"
-                        )
-                
-                elif "quality >= 0 and quality <= 100" in check_expr:
-                    invalid_mask = (df["quality"] < 0) | (df["quality"] > 100)
-                    if invalid_mask.any():
-                        raise ValidationError(
-                            f"Validation rule '{rule_name}' failed: {invalid_mask.sum()} rows have invalid quality scores"
-                        )
-                        
+                if filename.endswith(".parquet"):
+                    df = pd.read_parquet(filepath)
+                    if df.empty:
+                        warnings.append(f"{filename} exists but is empty")
+                elif filename.endswith(".json"):
+                    with open(filepath, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                        if not data:
+                            warnings.append(f"{filename} exists but is empty")
             except Exception as e:
-                raise ValidationError(f"Error evaluating validation rule '{rule_name}': {str(e)}")
+                issues.append(f"{filename} exists but cannot be read: {e}")
+        else:
+            issues.append(f"Missing {description} ({filename})")
     
-    def validate_dataframe_basic(
-        self,
-        df: pd.DataFrame,
-        required_columns: List[str] = None,
-        min_rows: int = 1,
-        name: str = "dataset"
-    ) -> None:
-        """Basic dataframe validation."""
-        
-        # Check if empty
-        if df.empty:
-            raise ValidationError(f"{name} is empty")
-        
-        # Check minimum rows
-        if len(df) < min_rows:
-            raise ValidationError(
-                f"{name} has insufficient rows: {len(df)} < {min_rows}",
-                details={"actual_rows": len(df), "required_min": min_rows}
-            )
-        
-        # Check required columns
-        if required_columns:
-            missing = set(required_columns) - set(df.columns)
-            if missing:
-                raise ValidationError(
-                    f"{name} missing required columns: {missing}",
-                    details={"missing_columns": list(missing)}
-                )
-        
-        # Check for all-null columns
-        null_cols = []
-        for col in df.columns:
-            if df[col].isnull().all():
-                null_cols.append(col)
-        
-        if null_cols:
-            raise ValidationError(
-                f"{name} has columns with all null values: {null_cols}",
-                details={"null_columns": null_cols}
-            )
+    # Check for smoke test specific files
+    smoke_files = ["smoke_scores.npy", "run_context.json"]
+    smoke_found = sum(1 for f in smoke_files if (results_dir / f).exists())
+    if smoke_found > 0 and smoke_found < len(smoke_files):
+        warnings.append("Partial smoke test files found")
     
-    def validate_simulation_results(self, df: pd.DataFrame) -> None:
-        """Validate simulation results data."""
-        required_columns = [
-            "allele_fraction", "umi_depth", "detected", "n_alt_umi",
-            "total_umi", "pvalue", "run_id"
-        ]
-        
-        self.validate_dataframe_basic(df, required_columns, name="simulation_results")
-        
-        # Specific validation for simulation results
-        if df["allele_fraction"].min() < 0 or df["allele_fraction"].max() > 1:
-            raise ValidationError("allele_fraction values must be between 0 and 1")
-        
-        if df["umi_depth"].min() <= 0:
-            raise ValidationError("umi_depth values must be positive")
-        
-        if not df["detected"].isin([0, 1]).all():
-            raise ValidationError("detected column must contain only 0 and 1")
-        
-        if df["pvalue"].min() < 0 or df["pvalue"].max() > 1:
-            raise ValidationError("pvalue values must be between 0 and 1")
+    # Check for reports
+    report_files = ["auto_report.html", "auto_report.md"]
+    report_found = any((results_dir / f).exists() for f in report_files)
+    if not report_found:
+        warnings.append("No report files found")
+    
+    # Validate metrics if available
+    metrics_file = results_dir / "metrics.json"
+    if metrics_file.exists():
+        try:
+            with open(metrics_file, "r", encoding="utf-8") as f:
+                metrics = json.load(f)
+            
+            # Check for key metrics
+            required_metrics = ["roc_auc", "pr_auc", "lod95_estimate"]
+            for metric in required_metrics:
+                if metric not in metrics:
+                    warnings.append(f"Missing metric: {metric}")
+                else:
+                    value = metrics[metric]
+                    if not isinstance(value, (int, float)) or value < 0:
+                        issues.append(f"Invalid {metric} value: {value}")
+        except Exception as e:
+            issues.append(f"Cannot validate metrics: {e}")
+    
+    # Determine status
+    if issues:
+        status = "FAILED"
+    elif warnings:
+        status = "WARNING"
+    else:
+        status = "PASSED"
+    
+    return {
+        "status": status,
+        "issues": issues,
+        "warnings": warnings,
+        "found_files": found_files,
+        "total_expected": len(expected_files),
+        "found_expected": len(found_files),
+        "completion_rate": len(found_files) / len(expected_files),
+    }
 
 
-# Convenience functions for common validation patterns
-def validate_umi_output(df: pd.DataFrame) -> None:
-    """Validate UMI consensus output."""
-    validator = DataValidator()
-    validator.validate_umi_consensus(df)
-
-
-def validate_simulation_output(df: pd.DataFrame) -> None:
-    """Validate simulation results output."""
-    validator = DataValidator()
-    validator.validate_simulation_results(df)
+def validate_determinism(results_dir: Path, reference_scores: list[float] | None = None) -> dict[str, Any]:
+    """Validate deterministic execution by comparing smoke scores.
+    
+    Args:
+        results_dir: Directory containing pipeline results
+        reference_scores: Reference scores to compare against
+        
+    Returns:
+        Validation result dictionary with status and details
+    """
+    import numpy as np
+    
+    issues = []
+    warnings = []
+    
+    smoke_scores_file = results_dir / "smoke_scores.npy"
+    
+    if not smoke_scores_file.exists():
+        issues.append("smoke_scores.npy not found")
+        return {
+            "status": "FAILED",
+            "issues": issues,
+            "warnings": warnings,
+        }
+    
+    try:
+        current_scores = np.load(smoke_scores_file)
+        
+        if reference_scores is not None:
+            reference_array = np.array(reference_scores)
+            
+            # Check if arrays have same shape
+            if current_scores.shape != reference_array.shape:
+                issues.append(f"Score array shape mismatch: {current_scores.shape} vs {reference_array.shape}")
+            else:
+                # Check numerical equality within tolerance
+                tolerance = 1e-10
+                if not np.allclose(current_scores, reference_array, atol=tolerance):
+                    issues.append(f"Scores differ from reference beyond tolerance {tolerance}")
+                    max_diff = np.max(np.abs(current_scores - reference_array))
+                    warnings.append(f"Maximum difference: {max_diff}")
+        
+        # Basic sanity checks
+        if np.any(np.isnan(current_scores)):
+            issues.append("NaN values found in scores")
+        
+        if np.any(np.isinf(current_scores)):
+            issues.append("Infinite values found in scores")
+        
+        if not np.all((current_scores >= 0) & (current_scores <= 1)):
+            warnings.append("Some scores outside [0,1] range")
+    
+    except Exception as e:
+        issues.append(f"Cannot load or validate smoke scores: {e}")
+    
+    # Determine status
+    if issues:
+        status = "FAILED"
+    elif warnings:
+        status = "WARNING"
+    else:
+        status = "PASSED"
+    
+    return {
+        "status": status,
+        "issues": issues,
+        "warnings": warnings,
+        "scores_shape": current_scores.shape if 'current_scores' in locals() else None,
+        "has_reference": reference_scores is not None,
+    }

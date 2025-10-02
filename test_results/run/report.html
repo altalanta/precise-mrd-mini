@@ -1,0 +1,103 @@
+<h1>MRD Pipeline Report</h1>
+<h2>Summary Metrics</h2>
+<ul>
+<li>ROC AUC: 0.1723</li>
+<li>Average Precision: 0.5017</li>
+<li>Brier Score: 0.592</li>
+<li>Detected Cases: 26 / 30</li>
+</ul>
+<h2>Calibration</h2>
+<table>
+<thead>
+<tr>
+<th>Bin</th>
+<th>Lower</th>
+<th>Upper</th>
+<th>Count</th>
+<th>Event Rate</th>
+<th>Confidence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>| 0 | 0.0 | 0.1 | 4456 | 0.612 | 0.0 |</p>
+<p>| 9 | 0.9 | 1.0 | 152 | 1.0 | 0.99 |</p>
+<h2>Limit of Detection Grid</h2>
+<table>
+<thead>
+<tr>
+<th>Variant</th>
+<th>Depth</th>
+<th>Allele Fraction</th>
+<th>Detection Rate</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>| VAR01 | 1000 | 0.0 | 0.0 |</p>
+<p>| VAR01 | 1000 | 0.01 | 0.094 |</p>
+<p>| VAR01 | 2000 | 0.0 | 0.0 |</p>
+<p>| VAR01 | 2000 | 0.01 | 0.11 |</p>
+<p>| VAR02 | 1000 | 0.0 | 0.0 |</p>
+<p>| VAR02 | 1000 | 0.005 | 0.052 |</p>
+<p>| VAR02 | 2000 | 0.0 | 0.0 |</p>
+<p>| VAR02 | 2000 | 0.005 | 0.04 |</p>
+<p>| VAR03 | 1000 | 0.0 | 0.0 |</p>
+<p>| VAR03 | 1000 | 0.001 | 0.013 |</p>
+<p>| VAR03 | 2000 | 0.0 | 0.0 |</p>
+<p>| VAR03 | 2000 | 0.001 | 0.008 |</p>
+<h2>Raw Metrics JSON</h2>
+<pre><code class="language-json">{
+  &quot;roc_auc&quot;: 0.17233555169753087,
+  &quot;roc_auc_ci&quot;: {
+    &quot;mean&quot;: 0.5261263524000725,
+    &quot;lower&quot;: 0.5130135900970787,
+    &quot;upper&quot;: 0.541442699535854,
+    &quot;std&quot;: 0.008307364621400689
+  },
+  &quot;average_precision&quot;: 0.5016862785493542,
+  &quot;average_precision_ci&quot;: {
+    &quot;mean&quot;: 0.6738248274010108,
+    &quot;lower&quot;: 0.6573187178860339,
+    &quot;upper&quot;: 0.6908819913921858,
+    &quot;std&quot;: 0.0099443260002189
+  },
+  &quot;brier_score&quot;: 0.5920174513662756,
+  &quot;detected_cases&quot;: 26,
+  &quot;total_cases&quot;: 30,
+  &quot;calibration&quot;: [
+    {
+      &quot;bin&quot;: 0,
+      &quot;lower&quot;: 0.0,
+      &quot;upper&quot;: 0.1,
+      &quot;count&quot;: 4456,
+      &quot;event_rate&quot;: 0.6122082585278277,
+      &quot;confidence&quot;: 1e-09
+    },
+    {
+      &quot;bin&quot;: 9,
+      &quot;lower&quot;: 0.9,
+      &quot;upper&quot;: 1.0,
+      &quot;count&quot;: 152,
+      &quot;event_rate&quot;: 1.0,
+      &quot;confidence&quot;: 0.9900645347197844
+    }
+  ]
+}
+</code></pre>

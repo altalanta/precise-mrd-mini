@@ -1,0 +1,28 @@
+include README.md
+include LICENSE
+include CHANGELOG.md
+include CONTRIBUTING.md
+include pyproject.toml
+include requirements.txt
+
+# Include package data
+recursive-include src/precise_mrd *.py
+recursive-include src/precise_mrd *.typed
+recursive-include src/precise_mrd/templates *.html *.j2
+recursive-include src/precise_mrd/schemas *.yaml *.json
+
+# Include configuration files
+recursive-include configs *.yaml *.yml
+
+# Include documentation
+recursive-include docs *.md *.rst
+include docs/requirements.txt
+
+# Exclude build artifacts and caches
+global-exclude *.pyc
+global-exclude __pycache__
+prune build/
+prune dist/
+prune *.egg-info/
+prune .pytest_cache/
+prune htmlcov/
