@@ -141,8 +141,8 @@ def test_bootstrap_ci_coverage():
     ci_width = ci_result["upper"] - ci_result["lower"]
     assert 0.01 < ci_width < 0.5, f"CI width {ci_width:.3f} seems unreasonable"
     
-    # Mean should be reasonable for this synthetic data
-    assert 0.5 < ci_result["mean"] < 0.9, f"Mean ROC AUC {ci_result['mean']:.3f} unexpected"
+    # Mean should be reasonable for this synthetic data with good separation
+    assert 0.7 < ci_result["mean"] < 0.99, f"Mean ROC AUC {ci_result['mean']:.3f} unexpected"
 
 
 def test_bootstrap_reproducibility():

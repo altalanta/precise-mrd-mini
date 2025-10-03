@@ -28,18 +28,35 @@ def simulate_reads(
     # Extract simulation parameters
     sim_config = config.simulation
     
+    # Handle case where simulation config might be a dict
+    if isinstance(sim_config, dict):
+        allele_fractions = sim_config['allele_fractions']
+        umi_depths = sim_config['umi_depths'] 
+        n_replicates = sim_config['n_replicates']
+    else:
+        allele_fractions = sim_config.allele_fractions
+        umi_depths = sim_config.umi_depths
+        n_replicates = sim_config.n_replicates
+    
+    # Handle UMI config
+    umi_config = config.umi
+    if isinstance(umi_config, dict):
+        max_family_size = umi_config['max_family_size']
+    else:
+        max_family_size = umi_config.max_family_size
+    
     # Generate synthetic data based on configuration
-    n_variants = len(sim_config.allele_fractions)
-    n_depths = len(sim_config.umi_depths)
-    total_samples = n_variants * n_depths * sim_config.n_replicates
+    n_variants = len(allele_fractions)
+    n_depths = len(umi_depths)
+    total_samples = n_variants * n_depths * n_replicates
     
     # Create grid of conditions
     data = []
     sample_id = 0
     
-    for af in sim_config.allele_fractions:
-        for depth in sim_config.umi_depths:
-            for rep in range(sim_config.n_replicates):
+    for af in allele_fractions:
+        for depth in umi_depths:
+            for rep in range(n_replicates):
                 # Simulate UMI families
                 n_families = depth
                 
@@ -48,7 +65,7 @@ def simulate_reads(
                 
                 # Generate reads per family (Poisson distributed)
                 family_sizes = rng.poisson(lam=5, size=n_families)
-                family_sizes = np.clip(family_sizes, 1, config.umi.max_family_size)
+                family_sizes = np.clip(family_sizes, 1, max_family_size)
                 
                 # Simulate variant calls
                 # True positives based on allele fraction
