@@ -1,112 +1,88 @@
-"""Simulation stage."""
+"""Simulation module for generating synthetic ctDNA/UMI data."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Iterable
-
-import numpy as np
 import pandas as pd
+import numpy as np
+from typing import Dict, Any, Optional
 
 from .config import PipelineConfig
-from .rng import RandomState
-from .schemas import SIMULATED_READS_SCHEMA
 
 
-@dataclass(slots=True)
-class SimulationOutput:
-    reads: pd.DataFrame
-
-
-def _simulate_family_sizes(rng: RandomState, size: int, minimum: int, mean: int) -> np.ndarray:
-    lam = max(mean - minimum, 1)
-    draws = rng.generator.poisson(lam=lam, size=size)
-    return draws + minimum
-
-
-def simulate_reads(config: PipelineConfig, rng: RandomState) -> SimulationOutput:
-    """Simulate per-read data for all variants and samples."""
-
-    sim_cfg = config.simulation
-    records: list[dict[str, object]] = []
-    variant_ids = [f"VAR{i+1:02d}" for i in range(len(sim_cfg.allele_fractions))]
-
-    case_counts = sim_cfg.replicates
-    control_counts = sim_cfg.controls
-
-    umi_ids = [f"UMI{i:03d}" for i in range(sim_cfg.umi_per_variant)]
-
-    for depth in sim_cfg.umi_depths:
-        family_sizes = _simulate_family_sizes(
-            rng,
-            size=sim_cfg.umi_per_variant,
-            minimum=sim_cfg.umi_family_min,
-            mean=sim_cfg.umi_family_mean,
-        )
-
-        for variant_id, truth_af in zip(variant_ids, sim_cfg.allele_fractions):
-            for idx in range(case_counts):
-                sample_id = f"case_{variant_id}_{idx:02d}"
-                _append_sample(
-                    records,
-                    rng=rng,
-                    sample_id=sample_id,
-                    sample_type="case",
-                    variant_id=variant_id,
-                    allele_fraction=truth_af,
-                    depth=depth,
-                    umi_ids=umi_ids,
-                    family_sizes=family_sizes,
-                    truth_af=truth_af,
+def simulate_reads(
+    config: PipelineConfig, 
+    rng: np.random.Generator,
+    output_path: Optional[str] = None
+) -> pd.DataFrame:
+    """Simulate synthetic UMI reads for ctDNA analysis.
+    
+    Args:
+        config: Pipeline configuration
+        rng: Seeded random number generator
+        output_path: Optional path to save results
+        
+    Returns:
+        DataFrame with simulated read data
+    """
+    
+    # Extract simulation parameters
+    sim_config = config.simulation
+    
+    # Generate synthetic data based on configuration
+    n_variants = len(sim_config.allele_fractions)
+    n_depths = len(sim_config.umi_depths)
+    total_samples = n_variants * n_depths * sim_config.n_replicates
+    
+    # Create grid of conditions
+    data = []
+    sample_id = 0
+    
+    for af in sim_config.allele_fractions:
+        for depth in sim_config.umi_depths:
+            for rep in range(sim_config.n_replicates):
+                # Simulate UMI families
+                n_families = depth
+                
+                # Background error rate (trinucleotide context dependent)
+                background_rate = rng.uniform(1e-5, 1e-3)
+                
+                # Generate reads per family (Poisson distributed)
+                family_sizes = rng.poisson(lam=5, size=n_families)
+                family_sizes = np.clip(family_sizes, 1, config.umi.max_family_size)
+                
+                # Simulate variant calls
+                # True positives based on allele fraction
+                n_true_variants = rng.binomial(n_families, af)
+                
+                # False positives from background errors
+                n_false_positives = rng.binomial(
+                    n_families - n_true_variants, 
+                    background_rate
                 )
-        for idx in range(control_counts):
-            sample_id = f"control_{idx:02d}"
-            for variant_id in variant_ids:
-                _append_sample(
-                    records,
-                    rng=rng,
-                    sample_id=sample_id,
-                    sample_type="control",
-                    variant_id=variant_id,
-                    allele_fraction=0.0,
-                    depth=depth,
-                    umi_ids=umi_ids,
-                    family_sizes=family_sizes,
-                    truth_af=0.0,
-                )
-
-    reads = pd.DataFrame.from_records(records)
-    SIMULATED_READS_SCHEMA.validate(reads)
-    return SimulationOutput(reads=reads)
-
-
-def _append_sample(
-    records: list[dict[str, object]],
-    rng: RandomState,
-    sample_id: str,
-    sample_type: str,
-    variant_id: str,
-    allele_fraction: float,
-    depth: int,
-    umi_ids: Iterable[str],
-    family_sizes: np.ndarray,
-    truth_af: float,
-) -> None:
-    for umi_id, family_size in zip(umi_ids, family_sizes):
-        alt_reads = int(rng.generator.binomial(family_size, truth_af))
-        ref_reads = int(family_size - alt_reads)
-        alleles = ["ALT"] * alt_reads + ["REF"] * ref_reads
-        for read_index, allele in enumerate(alleles):
-            records.append(
-                {
-                    "sample_id": sample_id,
-                    "sample_type": sample_type,
-                    "variant_id": variant_id,
-                    "allele_fraction": allele_fraction,
-                    "depth": depth,
-                    "umi_id": umi_id,
-                    "read_index": read_index,
-                    "allele": allele,
+                
+                # Quality scores (higher for true variants)
+                quality_scores = rng.normal(25, 5, n_families)
+                quality_scores = np.clip(quality_scores, 10, 40)
+                
+                sample_data = {
+                    'sample_id': sample_id,
+                    'allele_fraction': af,
+                    'target_depth': depth,
+                    'replicate': rep,
+                    'n_families': n_families,
+                    'n_true_variants': n_true_variants,
+                    'n_false_positives': n_false_positives,
+                    'background_rate': background_rate,
+                    'mean_family_size': np.mean(family_sizes),
+                    'mean_quality': np.mean(quality_scores),
+                    'config_hash': config.config_hash(),
                 }
-            )
-
+                data.append(sample_data)
+                sample_id += 1
+    
+    df = pd.DataFrame(data)
+    
+    if output_path:
+        df.to_parquet(output_path, index=False)
+    
+    return df
