@@ -14,10 +14,14 @@ def poisson_test(observed: int, expected: float) -> float:
     """Two-tailed Poisson test."""
     if expected <= 0:
         return 1.0
-    return 2 * min(
-        stats.poisson.cdf(observed, expected),
-        stats.poisson.sf(observed - 1, expected)
-    )
+    
+    # Calculate two-tailed p-value
+    left_tail = stats.poisson.cdf(observed, expected)
+    right_tail = stats.poisson.sf(observed - 1, expected)
+    
+    # Two-tailed: double the smaller tail, but cap at 1.0
+    p_value = 2 * min(left_tail, right_tail)
+    return min(p_value, 1.0)
 
 
 def binomial_test(successes: int, trials: int, p: float) -> float:
@@ -30,21 +34,24 @@ def binomial_test(successes: int, trials: int, p: float) -> float:
     if p >= 1:
         # Special case: if p=1 and we observed failures, it's very significant  
         return 0.0 if successes < trials else 1.0
-    return stats.binom_test(successes, trials, p, alternative='two-sided')
+    return stats.binomtest(successes, trials, p, alternative='two-sided').pvalue
 
 
 def benjamini_hochberg_correction(p_values: np.ndarray, alpha: float) -> Tuple[np.ndarray, np.ndarray]:
     """Benjamini-Hochberg FDR correction."""
-    p_values = np.asarray(p_values)
+    p_values = np.asarray(p_values, dtype=float)
     m = len(p_values)
     
     if m == 0:
         return np.array([], dtype=bool), np.array([])
     
+    # TODO: Implement proper idempotence later
+    # For now, always apply full BH procedure
+    
     sorted_indices = np.argsort(p_values)
     sorted_p = p_values[sorted_indices]
     
-    # BH procedure
+    # BH procedure for rejection
     rejected = np.zeros(m, dtype=bool)
     
     for i in range(m - 1, -1, -1):
@@ -57,7 +64,7 @@ def benjamini_hochberg_correction(p_values: np.ndarray, alpha: float) -> Tuple[n
     for i in range(m):
         adjusted_p[i] = sorted_p[i] * m / (i + 1)
     
-    # Ensure monotonicity
+    # Ensure monotonicity (decreasing from right to left)
     for i in range(m - 2, -1, -1):
         adjusted_p[i] = min(adjusted_p[i], adjusted_p[i + 1])
     
@@ -93,6 +100,16 @@ def call_mrd(
     
     stats_config = config.stats
     
+    # Handle case where stats config might be a dict
+    if isinstance(stats_config, dict):
+        test_type = stats_config['test_type']
+        alpha = stats_config['alpha']
+        fdr_method = stats_config['fdr_method']
+    else:
+        test_type = stats_config.test_type
+        alpha = stats_config.alpha
+        fdr_method = stats_config.fdr_method
+    
     # Group by sample for statistical testing
     call_data = []
     
@@ -117,12 +134,12 @@ def call_mrd(
         expected_variants = n_total * mean_error_rate
         
         # Perform statistical test
-        if stats_config.test_type == "poisson":
+        if test_type == "poisson":
             p_value = poisson_test(n_variants, expected_variants)
-        elif stats_config.test_type == "binomial":
+        elif test_type == "binomial":
             p_value = binomial_test(n_variants, n_total, mean_error_rate)
         else:
-            raise ValueError(f"Unknown test type: {stats_config.test_type}")
+            raise ValueError(f"Unknown test type: {test_type}")
         
         # Calculate effect size
         if expected_variants > 0:
@@ -145,7 +162,7 @@ def call_mrd(
             'p_value': p_value,
             'mean_quality': mean_quality,
             'mean_consensus': mean_consensus,
-            'test_type': stats_config.test_type,
+            'test_type': test_type,
             'config_hash': config.config_hash(),
         })
     
@@ -158,13 +175,13 @@ def call_mrd(
     p_values = df['p_value'].values
     rejected, adjusted_p = benjamini_hochberg_correction(
         p_values, 
-        stats_config.alpha
+        alpha
     )
     
     df['p_adjusted'] = adjusted_p
     df['significant'] = rejected
-    df['alpha'] = stats_config.alpha
-    df['fdr_method'] = stats_config.fdr_method
+    df['alpha'] = alpha
+    df['fdr_method'] = fdr_method
     
     if output_path:
         df.to_parquet(output_path, index=False)

@@ -29,6 +29,18 @@ def collapse_umis(
     
     umi_config = config.umi
     
+    # Handle case where umi config might be a dict
+    if isinstance(umi_config, dict):
+        min_family_size = umi_config['min_family_size']
+        max_family_size = umi_config['max_family_size']
+        quality_threshold = umi_config['quality_threshold'] 
+        consensus_threshold = umi_config['consensus_threshold']
+    else:
+        min_family_size = umi_config.min_family_size
+        max_family_size = umi_config.max_family_size
+        quality_threshold = umi_config.quality_threshold
+        consensus_threshold = umi_config.consensus_threshold
+    
     # Process each sample
     collapsed_data = []
     
@@ -42,10 +54,10 @@ def collapse_umis(
         for family_id in range(n_families):
             # Simulate family size (from original simulation)
             family_size = max(1, int(rng.poisson(5)))
-            family_size = min(family_size, umi_config.max_family_size)
+            family_size = min(family_size, max_family_size)
             
             # Skip families below minimum size threshold
-            if family_size < umi_config.min_family_size:
+            if family_size < min_family_size:
                 continue
             
             # Simulate quality scores for consensus
@@ -53,11 +65,11 @@ def collapse_umis(
             quality_score = np.clip(quality_score, 10, 40)
             
             # Determine if consensus passes quality threshold
-            passes_quality = quality_score >= umi_config.quality_threshold
+            passes_quality = quality_score >= quality_threshold
             
             # Simulate consensus agreement
             consensus_agreement = rng.uniform(0.5, 1.0)
-            passes_consensus = consensus_agreement >= umi_config.consensus_threshold
+            passes_consensus = consensus_agreement >= consensus_threshold
             
             # Determine variant call
             is_variant = passes_quality and passes_consensus and (
