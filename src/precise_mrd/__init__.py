@@ -15,7 +15,7 @@ from .config import PipelineConfig, load_config, dump_config
 from .utils import PipelineIO
 
 # Determinism and reproducibility
-from .determinism_utils import set_all_seeds, get_git_sha, determinism_context
+from .determinism_utils import set_global_seed, env_fingerprint
 
 # Reporting
 from .reporting import render_report, render_plots
@@ -34,9 +34,8 @@ __all__ = [
     "dump_config",
     "PipelineIO",
     # Determinism
-    "set_all_seeds",
-    "get_git_sha", 
-    "determinism_context",
+    "set_global_seed",
+    "env_fingerprint",
     # Reporting
     "render_report",
     "render_plots",

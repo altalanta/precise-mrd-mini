@@ -1,0 +1,75 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Precise MRD Run Context Schema",
+  "type": "object",
+  "required": [
+    "seed",
+    "timestamp",
+    "config_hash",
+    "git_sha",
+    "python_version"
+  ],
+  "properties": {
+    "seed": {
+      "type": "integer",
+      "description": "Random seed used for run"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO timestamp of run start"
+    },
+    "config_hash": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 64,
+      "description": "Hash of pipeline configuration"
+    },
+    "git_sha": {
+      "type": "string",
+      "description": "Git commit SHA (or 'unknown')"
+    },
+    "python_version": {
+      "type": "string",
+      "description": "Python version string"
+    },
+    "platform": {
+      "type": "string",
+      "description": "Platform information"
+    },
+    "numpy_version": {
+      "type": "string",
+      "description": "NumPy version"
+    },
+    "cli_args": {
+      "type": "object",
+      "description": "Command line arguments used"
+    },
+    "pandas_version": {
+      "type": "string",
+      "description": "Pandas version (if available)"
+    },
+    "scipy_version": {
+      "type": "string", 
+      "description": "SciPy version (if available)"
+    },
+    "torch_version": {
+      "type": ["string", "null"],
+      "description": "PyTorch version (if available)"
+    },
+    "cuda_available": {
+      "type": "boolean",
+      "description": "Whether CUDA is available"
+    },
+    "cpu_count": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Number of CPU cores"
+    },
+    "machine": {
+      "type": "string",
+      "description": "Machine architecture"
+    }
+  },
+  "additionalProperties": true
+}

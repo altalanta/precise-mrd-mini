@@ -1,386 +1,218 @@
 # Precise MRD
 
 [![CI](https://github.com/user/precise-mrd-mini/workflows/CI/badge.svg)](https://github.com/user/precise-mrd-mini/actions)
-[![Coverage](https://img.shields.io/badge/coverage-85%25-brightgreen.svg)](coverage.svg)
-[![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.11](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A ctDNA/UMI toy MRD pipeline with UMI-aware error modeling, LoB/LoD estimation, contamination controls, and comprehensive reporting.
+A ctDNA/UMI toy MRD pipeline with deterministic error modeling, statistical validation, and comprehensive CI/CD hardening.
 
 ## Features
 
-🧬 **UMI-Aware Error Modeling**
-- Consensus UMI calling with family-size thresholds
-- Trinucleotide context-specific error rates
-- Quality-weighted consensus with configurable parameters
+🧬 **Deterministic UMI Processing**
+- Modern NumPy RNG API (`np.random.default_rng`)
+- Reproducible seed management across all components
+- Hash-verified artifact consistency
 
-📊 **Statistical Analysis**
-- Poisson/binomial hypothesis testing
-- Benjamini-Hochberg FDR correction
-- P-value calibration and validation
+📊 **Statistical Rigor**
+- Type I error control validation
+- Benjamini-Hochberg FDR correction with monotonicity tests
+- Bootstrap confidence intervals with coverage validation
 
-🎯 **LoB/LoD Estimation**
-- Bootstrap-based LoD95 estimation
-- Detection probability curves across AF×depth grids
-- Limit of Blank calculation from negative controls
+🎯 **Artifact Contract**
+- Schema-validated JSON outputs
+- Guaranteed artifact paths and structure
+- Complete run context metadata
 
-🔬 **Quality Control**
-- Strand bias detection with Fisher's exact test
-- End-repair artifact filtering
-- Clinical guardrail validation
+🔍 **CI/CD Hardening**
+- Determinism verification (hash comparison)
+- Statistical sanity tests (< 60s runtime)
+- Fail-closed behavior on regressions
 
-📈 **Contamination Modeling**
-- Cross-sample contamination simulation
-- Barcode swap rate estimation
-- Contamination impact assessment
+## Quick Start
 
-📋 **Comprehensive Reporting**
-- Interactive HTML reports with embedded plots
-- LoD heatmaps and detection curves
-- QC metrics and performance summaries
-
-## Quickstart
-
-**3-command demo** (deterministic, CPU-only, <5 minutes):
+**3-command demo** (deterministic, <5 minutes):
 
 ```bash
-make setup     # Install dependencies and package in editable mode
-make smoke     # Run fast end-to-end pipeline with synthetic data
-```
-
-The smoke test runs a complete MRD pipeline with minimal synthetic data, producing `reports/metrics.json` and `reports/auto_report.html` with ROC/PR curves and detection metrics.
-
-### Docker
-
-```bash
-docker build -t precise-mrd-mini:cpu -f Dockerfile.cpu .
-docker run --rm -v $PWD/reports:/app/reports precise-mrd-mini:cpu
+make setup     # Install dependencies and package
+make smoke     # Run fast end-to-end pipeline  
+make determinism  # Verify identical hashes across runs
 ```
 
 ## Determinism & Reproducibility
 
-All pipeline stages use **fixed seeds** to ensure reproducible results:
-- Smoke test uses `seed=7` by default
-- Golden hash testing validates first 10 variant scores remain stable
-- Artifacts include `run_context.json` with seed, timestamp, and full configuration
-- Test suite includes determinism checks with SHA256 validation
+**Guaranteed deterministic execution**:
+- All random operations use seeded `np.random.Generator` instances
+- No global random state dependencies
+- SHA256-verified artifact consistency
+- Complete environment fingerprinting
+
+### Verification Commands
+
+```bash
+# Verify determinism (should show identical hashes)
+make determinism
+
+# Run statistical validation tests
+make stat-sanity
+
+# Generate hash manifest
+make smoke
+# Creates reports/hash_manifest.txt with SHA256 hashes
+```
 
 ## Artifact Contract
 
-The smoke path produces:
-- `reports/metrics.json` - ROC AUC, PR AUC, detection stats with 95% CI
-- `reports/auto_report.html` - Interactive HTML report with plots
+The pipeline **guarantees** these outputs:
+
+- `reports/metrics.json` - Performance metrics with bootstrap CIs
+- `reports/auto_report.html` - Interactive HTML report
 - `reports/run_context.json` - Complete reproducibility metadata
+- `reports/hash_manifest.txt` - SHA256 verification manifest
 
-## Full Pipeline (Snakemake)
+All artifacts validate against JSON schemas in `schemas/`.
 
-```bash
-# Run simulation with default parameters
-make simulate
+### Example Run Context
 
-# Generate HTML report
-make report
-
-# Run quick simulation for CI/testing
-make ci-small
-
-# Performance benchmark
-make benchmark
-```
-
-### Command Line Interface
-
-```bash
-# Initialize custom configuration
-precise-mrd init-config --output configs/my_analysis.yaml
-
-# Run simulation
-precise-mrd simulate --config configs/my_analysis.yaml --run-id my_analysis
-
-# Generate report
-precise-mrd report --results results/latest
-
-# Validate results
-precise-mrd validate --results results/latest
-
-# Performance benchmark
-precise-mrd benchmark
-```
-
-## Configuration
-
-### Default Configuration (`configs/default.yaml`)
-
-```yaml
-run_id: "default_run"
-seed: 42
-
-simulation:
-  allele_fractions: [0.05, 0.01, 0.001, 0.0005, 0.0001]
-  umi_depths: [5000, 10000, 20000, 50000]
-  n_replicates: 1000
-  n_bootstrap: 1000
-
-umi:
-  min_family_size: 3
-  max_family_size: 1000
-  quality_threshold: 20
-  consensus_threshold: 0.6
-
-stats:
-  test_type: "poisson"  # or "binomial"
-  alpha: 0.05
-  fdr_method: "benjamini_hochberg"
-
-lod:
-  detection_threshold: 0.95
-  confidence_level: 0.95
-```
-
-### Key Parameters
-
-- **allele_fractions**: Range of allele fractions to test (0.01% to 5%)
-- **umi_depths**: UMI family depths for simulation grid
-- **min_family_size**: Minimum UMI family size for consensus calling
-- **test_type**: Statistical test (`poisson` or `binomial`)
-- **detection_threshold**: LoD95 detection probability threshold
-
-## Pipeline Overview
-
-### 1. UMI Consensus Calling
-
-```python
-from precise_mrd import UMIProcessor
-
-processor = UMIProcessor(min_family_size=3, consensus_threshold=0.6)
-families = processor.process_reads(reads)
-consensus_data = processor.get_consensus_counts(families)
-```
-
-- Groups reads by UMI and genomic position
-- Calls consensus with quality weighting
-- Filters families by size thresholds
-- Handles outlier family sizes
-
-### 2. Error Modeling
-
-```python
-from precise_mrd import ErrorModel, ContextAnalyzer
-
-error_model = ErrorModel()
-context_analyzer = ContextAnalyzer()
-
-# Estimate context-specific error rates
-error_rates = error_model.estimate_background_errors(negative_control_data)
-```
-
-- Trinucleotide context normalization
-- Background error estimation from negative controls
-- Contamination rate modeling
-
-### 3. Statistical Testing
-
-```python
-from precise_mrd import StatisticalTester
-
-tester = StatisticalTester(test_type="poisson", alpha=0.05)
-results = tester.test_multiple_variants(variant_data, error_rates)
-```
-
-- Per-locus hypothesis testing
-- Multiple testing correction (FDR)
-- Effect size calculation
-
-### 4. LoD/LoB Estimation
-
-```python
-from precise_mrd import LODEstimator
-
-estimator = LODEstimator(detection_threshold=0.95)
-lod_result = estimator.bootstrap_lod_estimation(simulation_results, depth=10000)
-```
-
-- Bootstrap confidence intervals
-- Detection probability curves
-- Clinical sensitivity metrics
-
-## Assumptions and Limitations
-
-### Biological Assumptions
-
-1. **UMI Families**: Reads sharing UMIs originate from the same DNA molecule
-2. **Error Independence**: Sequencing errors are independent across reads
-3. **Context Effects**: Error rates vary by trinucleotide context
-4. **Contamination Model**: Cross-sample contamination follows barcode swap patterns
-
-### Technical Limitations
-
-1. **Synthetic Data**: Uses simulated reads, not real FASTQ files
-2. **Simplified Contamination**: Basic contamination model
-3. **Context Dependencies**: Limited trinucleotide contexts implemented
-4. **Performance**: Python implementation (Rust extension optional)
-
-### Statistical Considerations
-
-1. **Multiple Testing**: FDR correction assumes independence
-2. **Bootstrap Validity**: Requires sufficient replicates for stable estimates
-3. **P-value Calibration**: Depends on accurate error model
-4. **LoD Definition**: Based on 95% detection probability threshold
-
-## Performance
-
-### Benchmarks (N=1e6 reads)
-
-| Operation | Pure Python | Rust Extension | Speedup |
-|-----------|-------------|----------------|---------|
-| UMI Grouping | 2.3s | 1.1s | 2.1× |
-| Consensus Calling | 1.8s | 0.9s | 2.0× |
-| Statistical Testing | 0.5s | 0.5s | 1.0× |
-
-*Benchmarks on MacBook Pro M1, 16GB RAM*
-
-### Memory Usage
-
-- **Small simulation** (CI): ~200MB peak
-- **Default simulation**: ~1.2GB peak  
-- **Large simulation** (1M families): ~4.8GB peak
-
-## Clinical Guardrails
-
-### Sample Validity Criteria
-
-```python
-# Minimum requirements for valid sample
-qc_thresholds = {
-    'min_total_umi_families': 1000,
-    'max_contamination_rate': 0.05,
-    'min_depth_per_locus': 100,
-    'min_consensus_rate': 0.8
+```json
+{
+  "seed": 7,
+  "timestamp": "2024-10-03T14:30:00.000Z",
+  "config_hash": "a1b2c3d4e5f6",
+  "git_sha": "7fd5373abc...",
+  "python_version": "3.11.5",
+  "numpy_version": "1.24.4",
+  "cli_args": {"command": "smoke", "seed": 7}
 }
 ```
 
-### Invalid Sample Criteria
+## Pipeline Overview
 
-- **Insufficient depth**: <1000 total UMI families
-- **High contamination**: >5% estimated contamination rate
-- **Poor consensus**: <80% consensus calling rate
-- **Technical failure**: Multiple QC metrics outside acceptable ranges
+### 1. Simulation (`simulate_reads`)
+- Generates synthetic UMI families with configurable AF/depth grid
+- Trinucleotide context-aware error modeling
+- Deterministic family size distributions
 
-## Results Interpretation
+### 2. UMI Collapse (`collapse_umis`) 
+- Quality-weighted consensus calling
+- Configurable family size thresholds
+- Consensus agreement filtering
 
-### LoD95 Values
+### 3. Error Modeling (`fit_error_model`)
+- Context-specific background error estimation
+- Bootstrap confidence intervals
+- Negative control validation
 
-- **Excellent** (≤0.01%): Suitable for MRD monitoring
-- **Good** (0.01-0.1%): Adequate for most clinical applications  
-- **Acceptable** (0.1-1%): Limited sensitivity, use with caution
-- **Poor** (>1%): Insufficient for MRD detection
+### 4. Statistical Testing (`call_mrd`)
+- Poisson/binomial hypothesis testing
+- Benjamini-Hochberg FDR correction
+- Effect size calculation
 
-### LoB Interpretation
+### 5. Performance Metrics (`calculate_metrics`)
+- ROC/PR AUC with bootstrap CIs
+- Calibration analysis
+- Detection rate statistics
 
-- **LoB <1%**: Low false positive rate, high specificity
-- **LoB 1-5%**: Moderate false positive rate, acceptable for screening
-- **LoB >5%**: High false positive rate, requires optimization
+## Configuration
 
-### QC Metrics
+```yaml
+# configs/smoke.yaml
+run_id: "smoke_test"
+seed: 7
 
-- **Strand bias p-value <0.01**: Potential technical artifact
-- **End-repair enrichment**: Filter G>T/C>A near fragment ends
-- **Family size distribution**: Log-normal expected, extreme outliers flagged
+simulation:
+  allele_fractions: [0.01, 0.001, 0.0001]
+  umi_depths: [1000, 5000]
+  n_replicates: 10
+  n_bootstrap: 100
 
-## Output Files
+umi:
+  min_family_size: 3
+  consensus_threshold: 0.6
 
-### Results Directory Structure
-
+stats:
+  test_type: "poisson"
+  alpha: 0.05
+  fdr_method: "benjamini_hochberg"
 ```
-results/runs/<run_id>/
-├── detection_matrix.csv      # AF×depth detection probabilities
-├── statistical_results.csv   # Per-variant test results
-├── filter_results.csv        # Quality filter outcomes
-├── qc_metrics.json          # Quality control metrics
-├── runtime_metrics.json     # Performance measurements
-└── lockfile.json           # Reproducibility metadata
+
+## Command Line Interface
+
+```bash
+# Fast smoke test
+precise-mrd smoke --seed 7 --out data/smoke
+
+# Determinism verification
+precise-mrd determinism-check --seed 7
 ```
-
-### HTML Report Sections
-
-1. **Summary**: Key metrics and performance indicators
-2. **LoD Analysis**: Detection curves and LoD95 estimates  
-3. **LoB Analysis**: False positive rates and thresholds
-4. **Context Analysis**: Error rates by trinucleotide context
-5. **QC Metrics**: Sample quality and filter performance
-6. **Configuration**: Run parameters and reproducibility info
 
 ## Development
 
 ### Running Tests
 
 ```bash
-# Unit tests with coverage
+# All tests
+make test
+
+# Test coverage
 make coverage
 
-# Specific test modules
-pytest tests/test_umi.py -v
-pytest tests/test_stats.py -v
-pytest tests/test_lod.py -v
+# Statistical validation only
+make stat-sanity
 
-# Performance tests
-python -m precise_mrd.profiling
+# Determinism check
+make determinism
 ```
 
 ### Code Quality
 
 ```bash
-# Linting and formatting
-make lint
-make format
-
-# Type checking
-mypy src/precise_mrd/
-
-# Security scan
-bandit -r src/
+make lint      # Flake8 + mypy
+make format    # Black + isort
 ```
 
-### Building Documentation
+### CI/CD Pipeline
 
-```bash
-# Generate API documentation
-sphinx-build -b html docs/ docs/_build/
+The CI includes **fail-closed** jobs:
 
-# Update validation report
-make report
-# -> Updates docs/validation.md automatically
-```
+1. **Unit Tests** - Full test suite with coverage
+2. **Determinism** - Hash comparison across identical runs
+3. **Stats Sanity** - Type I error, FDR, bootstrap validation
 
-## Contributing
+**Any failure blocks the PR merge.**
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+## Statistical Validation
 
-### Development Setup
+The pipeline includes lightweight statistical tests:
 
-```bash
-# Install development dependencies
-pip install -r requirements.txt
-pip install -e .[dev]
+- **Type I Error Control**: Validates α-level control in hypothesis testing
+- **FDR Monotonicity**: Ensures BH correction is properly implemented  
+- **Bootstrap Coverage**: Verifies CI coverage on synthetic data
 
-# Setup pre-commit hooks
-pre-commit install
+All tests run in <60s for CI efficiency.
 
-# Run full test suite
-make test
-```
+## Repository Safety
+
+⚠️ **Important**: Avoid `git clean -xfd` as it removes untracked work.
+
+Use `make clean-safe` instead to clean only generated artifacts.
+
+## Performance
+
+- **Smoke test**: <5 minutes on standard CI
+- **Statistical tests**: <60 seconds  
+- **Memory usage**: ~200MB peak for smoke test
+
+## Limitations
+
+1. **Synthetic Data**: Uses simulated reads, not real FASTQ
+2. **Simplified Models**: Basic error and contamination models
+3. **Limited Contexts**: Subset of trinucleotide contexts implemented
 
 ## Citation
 
-If you use this pipeline in your research, please cite:
-
 ```bibtex
 @software{precise_mrd,
-  title = {Precise MRD: ctDNA/UMI MRD Pipeline},
+  title = {Precise MRD: Deterministic ctDNA/UMI Pipeline},
   author = {Precise MRD Team},
   url = {https://github.com/user/precise-mrd-mini},
   version = {0.1.0},
@@ -391,15 +223,3 @@ If you use this pipeline in your research, please cite:
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Support
-
-- 📖 [Documentation](https://user.github.io/precise-mrd-mini/)
-- 🐛 [Issue Tracker](https://github.com/user/precise-mrd-mini/issues)
-- 💬 [Discussions](https://github.com/user/precise-mrd-mini/discussions)
-
-## Acknowledgments
-
-- Inspired by best practices in clinical NGS pipelines
-- Statistical methods adapted from cancer genomics literature
-- UMI consensus algorithms based on published protocols

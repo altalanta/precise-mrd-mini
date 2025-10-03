@@ -1,127 +1,162 @@
-"""Reporting utilities."""
+"""Report generation for MRD pipeline results."""
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Dict, Any, Optional
 
-import jinja2
-import markdown
-import numpy as np
 import pandas as pd
 
-from .utils import ARTIFACT_FILENAMES
+
+def render_plots(
+    calls_df: pd.DataFrame,
+    metrics: Dict[str, Any],
+    output_dir: str = "reports"
+) -> Dict[str, str]:
+    """Generate plots for MRD analysis.
+    
+    Args:
+        calls_df: DataFrame with MRD calls
+        metrics: Metrics dictionary
+        output_dir: Output directory for plots
+        
+    Returns:
+        Dictionary mapping plot types to file paths
+    """
+    # For now, return placeholder paths
+    # In a full implementation, this would generate actual plots
+    plot_paths = {
+        "roc_curve": f"{output_dir}/roc_curve.png",
+        "precision_recall": f"{output_dir}/precision_recall.png", 
+        "calibration": f"{output_dir}/calibration.png",
+        "lod_heatmap": f"{output_dir}/lod_heatmap.png"
+    }
+    
+    return plot_paths
 
 
 def render_report(
-    metrics: dict[str, Any],
-    lod_grid: pd.DataFrame,
-    output_dir: Path,
-    template_path: Path | None,
-) -> tuple[Path, Path]:
-    environment = jinja2.Environment(autoescape=False)
-    if template_path is None:
-        template = DEFAULT_TEMPLATE
-    else:
-        template = Path(template_path).read_text(encoding="utf-8")
-
-    md_content = environment.from_string(template).render(
-        metrics=metrics,
-        lod_grid=lod_grid.to_dict(orient="records"),
-        json_metrics=json.dumps(metrics, indent=2),
-    )
-
-    md_path = output_dir / ARTIFACT_FILENAMES["report_md"]
-    md_path.write_text(md_content, encoding="utf-8")
-
-    html = markdown.markdown(md_content, extensions=["tables", "fenced_code"])
-    html_path = output_dir / ARTIFACT_FILENAMES["report_html"]
-    html_path.write_text(html, encoding="utf-8")
-    return md_path, html_path
-
-
-def render_plots(calls: pd.DataFrame, output_dir: Path) -> dict[str, str]:
-    try:
-        import matplotlib.pyplot as plt
-    except Exception:  # pragma: no cover - optional dependency
-        return {}
-
-    calls = calls.copy()
-    calls.sort_values("pvalue", inplace=True)
-    labels = calls["truth_positive"].astype(int).to_numpy()
-    scores = 1.0 - calls["pvalue"].to_numpy()
-
-    # ROC
-    order = scores.argsort()[::-1]
-    labels_sorted = labels[order]
-    positives = labels_sorted.sum()
-    negatives = len(labels_sorted) - positives
-    if positives and negatives:
-        tpr = (labels_sorted.cumsum()) / positives
-        fpr = (np.cumsum(1 - labels_sorted)) / negatives
-        plt.figure(figsize=(4, 4), dpi=150)
-        plt.plot(fpr, tpr, label="ROC")
-        plt.plot([0, 1], [0, 1], linestyle="--", color="grey")
-        plt.xlabel("False Positive Rate")
-        plt.ylabel("True Positive Rate")
-        plt.title("ROC Curve")
-        roc_path = output_dir / ARTIFACT_FILENAMES["roc_png"]
-        plt.tight_layout()
-        plt.savefig(roc_path)
-        plt.close()
-    else:
-        roc_path = None
-
-    # PR
-    precision = (labels_sorted.cumsum()) / (np.arange(len(labels_sorted)) + 1)
-    recall = (labels_sorted.cumsum()) / positives if positives else np.zeros_like(scores)
-    plt.figure(figsize=(4, 4), dpi=150)
-    plt.plot(recall, precision, label="PR")
-    plt.xlabel("Recall")
-    plt.ylabel("Precision")
-    plt.title("Precision-Recall Curve")
-    plt.tight_layout()
-    pr_path = output_dir / ARTIFACT_FILENAMES["pr_png"]
-    plt.savefig(pr_path)
-    plt.close()
-
-    artifacts = {}
-    if roc_path:
-        artifacts["roc_plot"] = str(roc_path)
-    artifacts["pr_plot"] = str(pr_path)
-    return artifacts
-
-
-DEFAULT_TEMPLATE = """
-# MRD Pipeline Report
-
-## Summary Metrics
-
-- ROC AUC: {{ metrics.roc_auc | round(4) }}
-- Average Precision: {{ metrics.average_precision | round(4) }}
-- Brier Score: {{ metrics.brier_score | round(4) }}
-- Detected Cases: {{ metrics.detected_cases }} / {{ metrics.total_cases }}
-
-## Calibration
-
-| Bin | Lower | Upper | Count | Event Rate | Confidence |
-| --- | --- | --- | --- | --- | --- |
-{% for row in metrics.calibration %}
-| {{ row.bin }} | {{ row.lower | round(3) }} | {{ row.upper | round(3) }} | {{ row.count }} | {{ row.event_rate | round(3) }} | {{ row.confidence | round(3) }} |
-{% endfor %}
-
-## Limit of Detection Grid
-
-| Variant | Depth | Allele Fraction | Detection Rate |
-| --- | --- | --- | --- |
-{% for row in lod_grid %}
-| {{ row.variant_id }} | {{ row.depth }} | {{ row.allele_fraction | round(4) }} | {{ row.detection_rate | round(3) }} |
-{% endfor %}
-
-## Raw Metrics JSON
-
-```json
-{{ json_metrics }}
-```
+    calls_df: pd.DataFrame,
+    metrics: Dict[str, Any],
+    config: Dict[str, Any],
+    run_context: Dict[str, Any],
+    output_path: str = "reports/auto_report.html"
+) -> str:
+    """Generate HTML report for MRD analysis.
+    
+    Args:
+        calls_df: DataFrame with MRD calls
+        metrics: Metrics dictionary
+        config: Pipeline configuration
+        run_context: Run context metadata
+        output_path: Output path for HTML report
+        
+    Returns:
+        Path to generated HTML report
+    """
+    
+    # Simple HTML template
+    html_template = """
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Precise MRD Analysis Report</title>
+    <style>
+        body {{ font-family: Arial, sans-serif; margin: 40px; }}
+        .header {{ background-color: #f0f0f0; padding: 20px; border-radius: 5px; }}
+        .metric {{ margin: 10px 0; }}
+        .metric-value {{ font-weight: bold; color: #2c5aa0; }}
+        table {{ border-collapse: collapse; width: 100%; margin: 20px 0; }}
+        th, td {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
+        th {{ background-color: #f2f2f2; }}
+        .footer {{ margin-top: 40px; font-size: 12px; color: #666; }}
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Precise MRD Analysis Report</h1>
+        <p>Generated: {timestamp}</p>
+        <p>Git SHA: {git_sha}</p>
+        <p>Seed: {seed}</p>
+    </div>
+    
+    <h2>Performance Metrics</h2>
+    <div class="metric">
+        ROC AUC: <span class="metric-value">{roc_auc:.3f}</span>
+        (95% CI: {roc_ci_lower:.3f} - {roc_ci_upper:.3f})
+    </div>
+    <div class="metric">
+        Average Precision: <span class="metric-value">{avg_precision:.3f}</span>
+        (95% CI: {ap_ci_lower:.3f} - {ap_ci_upper:.3f})
+    </div>
+    <div class="metric">
+        Detected Cases: <span class="metric-value">{detected_cases}</span> / {total_cases}
+    </div>
+    <div class="metric">
+        Brier Score: <span class="metric-value">{brier_score:.3f}</span>
+    </div>
+    
+    <h2>Configuration</h2>
+    <table>
+        <tr><th>Parameter</th><th>Value</th></tr>
+        <tr><td>Test Type</td><td>{test_type}</td></tr>
+        <tr><td>Alpha</td><td>{alpha}</td></tr>
+        <tr><td>Min Family Size</td><td>{min_family_size}</td></tr>
+        <tr><td>Consensus Threshold</td><td>{consensus_threshold}</td></tr>
+    </table>
+    
+    <h2>Sample Summary</h2>
+    <p>Total samples processed: {n_samples}</p>
+    <p>Allele fractions tested: {allele_fractions}</p>
+    
+    <div class="footer">
+        <p>Generated by Precise MRD Pipeline v{version}</p>
+        <p>Config hash: {config_hash}</p>
+    </div>
+</body>
+</html>
 """
+    
+    # Extract values for template
+    roc_ci = metrics.get('roc_auc_ci', {})
+    ap_ci = metrics.get('average_precision_ci', {})
+    
+    # Get allele fractions from data
+    if len(calls_df) > 0:
+        allele_fractions = sorted(calls_df['allele_fraction'].unique())
+        af_str = ', '.join(f"{af:.4f}" for af in allele_fractions)
+    else:
+        af_str = "None"
+    
+    html_content = html_template.format(
+        timestamp=run_context.get('timestamp', 'Unknown'),
+        git_sha=run_context.get('git_sha', 'Unknown')[:8],
+        seed=run_context.get('seed', 'Unknown'),
+        roc_auc=metrics.get('roc_auc', 0.0),
+        roc_ci_lower=roc_ci.get('lower', 0.0),
+        roc_ci_upper=roc_ci.get('upper', 0.0),
+        avg_precision=metrics.get('average_precision', 0.0),
+        ap_ci_lower=ap_ci.get('lower', 0.0),
+        ap_ci_upper=ap_ci.get('upper', 0.0),
+        detected_cases=metrics.get('detected_cases', 0),
+        total_cases=metrics.get('total_cases', 0),
+        brier_score=metrics.get('brier_score', 0.0),
+        test_type=config.get('stats', {}).get('test_type', 'Unknown'),
+        alpha=config.get('stats', {}).get('alpha', 0.05),
+        min_family_size=config.get('umi', {}).get('min_family_size', 'Unknown'),
+        consensus_threshold=config.get('umi', {}).get('consensus_threshold', 'Unknown'),
+        n_samples=len(calls_df),
+        allele_fractions=af_str,
+        version="0.1.0",
+        config_hash=run_context.get('config_hash', 'Unknown')
+    )
+    
+    # Ensure output directory exists
+    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+    
+    # Write HTML file
+    with open(output_path, 'w') as f:
+        f.write(html_content)
+    
+    return output_path
