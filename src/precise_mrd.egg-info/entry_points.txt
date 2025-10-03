@@ -1,2 +1,2 @@
 [console_scripts]
-precise-mrd = precise_mrd.cli:main
+precise-mrd = precise_mrd.cli:cli
