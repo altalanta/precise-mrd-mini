@@ -1,158 +1,193 @@
-# Precise MRD
+# Precise MRD - Detection Limit Analytics
 
-[![CI](https://github.com/precise-mrd/precise-mrd-mini/workflows/CI/badge.svg)](https://github.com/precise-mrd/precise-mrd-mini/actions)
-[![PyPI version](https://badge.fury.io/py/precise-mrd.svg)](https://badge.fury.io/py/precise-mrd)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/precise-mrd/precise-mrd-mini/blob/main/LICENSE)
+[![CI](https://github.com/altalanta/precise-mrd-mini/workflows/CI/badge.svg)](https://github.com/altalanta/precise-mrd-mini/actions)
+[![Python 3.11](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Docs](https://img.shields.io/badge/docs-mkdocs-blue)](https://altalanta.github.io/precise-mrd-mini/)
 
-A production-ready **ctDNA/UMI MRD simulator + caller** with deterministic error modeling, comprehensive statistical analysis, and clinical-grade quality assurance.
+A ctDNA/UMI toy MRD pipeline with **formal detection limit analytics**, statistical validation, and comprehensive contamination robustness testing.
+
+## 🎯 Key Features
+
+### 🧬 **Deterministic UMI Processing**
+- Modern NumPy RNG API (`np.random.default_rng`)
+- Reproducible seed management across all components
+- Hash-verified artifact consistency
+
+### 📊 **Formal Detection Limits**
+- **LoB (Limit of Blank)**: 95th percentile of blank measurements
+- **LoD (Limit of Detection)**: AF yielding 95% detection probability with bias-corrected CIs
+- **LoQ (Limit of Quantification)**: Lowest AF meeting precision criteria (CV ≤ 20%)
+
+### 🔬 **Contamination Robustness**
+- Index-hopping stress testing with configurable hop rates
+- Barcode collision modeling and impact assessment
+- Cross-sample contamination sensitivity analysis
+
+### 📈 **Stratified Analysis**
+- Power analysis by trinucleotide context and depth
+- Calibration assessment across AF/depth strata
+- Context-specific error modeling
+
+### 🎯 **Artifact Contract**
+- Schema-validated JSON outputs
+- Guaranteed artifact paths and structure
+- Complete run context metadata
 
 ## 🚀 Quick Start
 
-=== "pip install"
-
-    ```bash
-    pip install precise-mrd
-    ```
-
-=== "Docker"
-
-    ```bash
-    docker pull ghcr.io/precise-mrd/precise-mrd:latest
-    ```
-
-=== "Development"
-
-    ```bash
-    git clone https://github.com/precise-mrd/precise-mrd-mini.git
-    cd precise-mrd-mini
-    make setup
-    ```
-
-### 60-Second Demo
-
-Run the complete pipeline with synthetic data:
+**3-command demo** (deterministic, <5 minutes):
 
 ```bash
-# Fast deterministic pipeline (<60s)
-precise-mrd smoke --seed 7
-
-# View results
-ls reports/
-# → metrics.json, auto_report.html, run_context.json
+make setup     # Install dependencies and package
+make smoke     # Run fast end-to-end pipeline  
+make determinism  # Verify identical hashes across runs
 ```
 
-!!! success "Production Ready"
-    - 🔬 **Deterministic**: Fixed seeds ensure reproducible results
-    - 📊 **Validated**: 90%+ test coverage with golden hash verification  
-    - 🏭 **CI/CD**: Automated testing, building, and publishing
-    - 📋 **Compliant**: Clinical guardrails and QC metrics
+## 📋 Detection Limit Analytics
 
-## ✨ Key Features
+### Limit of Blank (LoB)
+Simulate pure-blank runs and estimate the 95th percentile of background measurements:
 
-### 🧬 UMI-Aware Error Modeling
-- **Consensus calling** with family-size thresholds and quality weighting
-- **Trinucleotide context** error rates with contamination controls
-- **Clinical guardrails** for sample validity and QC metrics
-
-### 📈 Statistical Analysis
-- **Hypothesis testing**: Poisson/binomial tests with Benjamini-Hochberg FDR
-- **LoD/LoB estimation**: Bootstrap confidence intervals and detection curves
-- **P-value calibration**: Validation against theoretical distributions
-
-### 🎯 Quality Control
-- **Deterministic execution**: SHA256 validation of numerical outputs
-- **Golden tests**: Regression testing with precise hash matching
-- **Performance monitoring**: 60-second budget enforcement
-
-### 📋 Comprehensive Reporting
-- **Interactive HTML** with embedded plots and metrics
-- **Machine-readable JSON** for downstream analysis
-- **Reproducibility metadata** with git SHA and full configuration
-
-## 🔬 Pipeline Overview
-
-```mermaid
-graph LR
-    A[Simulate] --> B[Collapse UMIs]
-    B --> C[Error Model]
-    C --> D[Call Variants]
-    D --> E[Report]
-    
-    A -.-> F[Synthetic reads<br/>with UMI families]
-    B -.-> G[Consensus<br/>sequences]
-    C -.-> H[Context error<br/>rates]
-    D -.-> I[Statistical<br/>calls + LoD]
-    E -.-> J[HTML report<br/>+ metrics]
+```bash
+# Run LoB estimation
+precise-mrd eval-lob --n-blank-runs 100 --seed 7
 ```
 
-Each stage is:
-- **Deterministic** with fixed seeds
-- **Validated** with comprehensive tests  
-- **Traceable** with execution lineage
-- **Configurable** with YAML parameters
+**Output**: `reports/lob.json` with background statistics
 
-## 📊 Example Results
+### Limit of Detection (LoD)
+Estimate AF yielding 95% detection across depth grid with bias-corrected confidence intervals:
 
-The pipeline produces clinical-grade metrics:
-
-```json
-{
-  "roc_auc": 0.987,
-  "pr_auc": 0.924,
-  "lod95_estimate": 0.0031,
-  "lod95_ci": [0.0028, 0.0035],
-  "sensitivity_95ci": [0.89, 0.97],
-  "specificity": 0.994
-}
+```bash
+# Run LoD estimation across AF range
+precise-mrd eval-lod --af-range 1e-4,1e-2 --depths 1000,5000,10000 --seed 7
 ```
 
-With interactive visualizations:
+**Outputs**: 
+- `reports/lod_table.csv` - LoD values per depth with CIs
+- `reports/lod_curves.png` - Detection curves visualization
 
-- 📈 **ROC/PR curves** with confidence intervals
-- 🔥 **LoD heatmaps** across AF×depth grids  
-- 📊 **Detection probability** curves
-- 🧪 **QC metrics** and performance summaries
+### Limit of Quantification (LoQ)
+Find lowest AF meeting precision criteria (CV ≤ 20%):
 
-## 🎯 Use Cases
+```bash
+# Run LoQ estimation
+precise-mrd eval-loq --cv-threshold 0.20 --seed 7
+```
 
-### Research Applications
-- **Method development**: Compare UMI consensus algorithms
-- **Assay optimization**: Determine optimal depth and family size
-- **Benchmark studies**: Validate new statistical approaches
+**Output**: `reports/loq_table.csv` - LoQ values per depth
 
-### Clinical Applications
-- **Assay validation**: Establish LoD/LoB for regulatory submissions
-- **QC monitoring**: Track performance metrics over time
-- **Training**: Demonstrate MRD concepts with realistic data
+## 🧪 Contamination Stress Testing
 
-### Educational Use
-- **Bioinformatics courses**: Hands-on MRD pipeline experience
-- **Statistical methods**: Explore hypothesis testing and FDR correction
-- **Reproducibility**: Learn best practices for deterministic analysis
+Test detection robustness under various contamination scenarios:
 
-## 🚀 Next Steps
+```bash
+# Run contamination stress tests
+precise-mrd eval-contamination --hop-rates 0.0,0.001,0.005,0.01 --seed 7
+```
 
-- **[Quickstart Guide](quickstart.md)**: Get up and running in 5 minutes
-- **[CLI Reference](cli/index.md)**: Complete command documentation
-- **[Methods](methods/index.md)**: Statistical algorithms and assumptions
-- **[API Reference](reference/)**: Python API documentation
+**Outputs**:
+- `reports/contam_sensitivity.json` - Sensitivity under contamination
+- `reports/contam_heatmap.png` - Impact visualization
 
-## 📋 Requirements
+## 📊 Stratified Analysis
 
-- **Python**: 3.10, 3.11, or 3.12
-- **Memory**: 1-4GB depending on simulation size
-- **Time**: <60s for smoke test, <10min for full analysis
+Analyze power and calibration by context and depth:
 
-## 🤝 Contributing
+```bash
+# Run stratified analysis
+precise-mrd eval-stratified --contexts CpG,CHG,CHH,NpN --seed 7
+```
 
-We welcome contributions! See our [Contributing Guide](contributing.md) for details.
+**Outputs**:
+- `reports/power_by_stratum.json` - Context-specific power
+- `reports/calibration_by_bin.csv` - Binned calibration metrics
 
-- 🐛 **Bug reports**: Use GitHub issues
-- 💡 **Feature requests**: Start a discussion
-- 🔧 **Code contributions**: Fork and submit PRs
-- 📖 **Documentation**: Help improve our docs
+## 🔄 Reproducibility
+
+All analyses are **deterministically reproducible**:
+
+```bash
+# Verify determinism
+make determinism
+# Should show identical hashes across runs
+
+# Full statistical validation
+make stat-sanity
+# Validates Type I error control, FDR, bootstrap coverage
+```
+
+## 📈 Performance Metrics
+
+### Expected Detection Limits
+- **LoB**: ~0.5-2 false positives per 10K UMIs
+- **LoD**: ~1e-3 to 1e-4 AF (depth-dependent)
+- **LoQ**: ~5e-3 to 1e-3 AF (20% CV threshold)
+
+### Contamination Tolerance
+- **Index hopping**: <1% sensitivity loss at 0.5% hop rate
+- **Barcode collisions**: <5% false positive increase at 0.1% collision rate
+- **Cross-contamination**: Robust up to 5% cross-sample mixing
+
+## 🎯 Validation Framework
+
+### Statistical Sanity Tests
+- **Type I Error Control**: α-level validation in hypothesis testing
+- **FDR Monotonicity**: Benjamini-Hochberg correction verification
+- **Bootstrap Coverage**: CI coverage on synthetic data
+- **LoB/LoD Consistency**: LoB < LoD monotonicity checks
+
+### CI/CD Integration
+All tests run in <60s for CI efficiency with fail-closed behavior.
+
+## 📁 Artifact Structure
+
+```
+reports/
+├── lob.json                    # Limit of Blank results
+├── lod_table.csv              # Limit of Detection per depth
+├── lod_curves.png             # LoD visualization
+├── loq_table.csv              # Limit of Quantification
+├── power_by_stratum.json      # Stratified power analysis
+├── calibration_by_bin.csv     # Binned calibration metrics
+├── contam_sensitivity.json    # Contamination impact
+├── contam_heatmap.png         # Contamination visualization
+├── metrics.json               # Performance metrics
+├── auto_report.html           # Interactive HTML report
+├── run_context.json           # Reproducibility metadata
+└── hash_manifest.txt          # SHA256 verification
+```
+
+## 🔬 Scientific Rigor
+
+### Detection Limit Standards
+Following **CLSI EP17** guidelines for detection capability:
+- LoB: Highest blank measurement (95th percentile)
+- LoD: 95% detection probability with Type I/II error control
+- LoQ: Acceptable precision (CV ≤ 20% or absolute error threshold)
+
+### Statistical Methodology
+- **Stratified bootstrap**: Bias-corrected confidence intervals
+- **Logistic regression**: Detection curve fitting with robust estimation
+- **Calibration assessment**: Expected Calibration Error (ECE) and reliability diagrams
+
+## 🛠 Development
+
+### Running Tests
+```bash
+make test          # All tests
+make coverage      # Test coverage
+make stat-sanity   # Statistical validation only
+make determinism   # Determinism verification
+```
+
+### Code Quality
+```bash
+make lint      # Flake8 + mypy
+make format    # Black + isort
+```
 
 ## 📄 License
 
-MIT License - see [LICENSE](https://github.com/precise-mrd/precise-mrd-mini/blob/main/LICENSE) for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

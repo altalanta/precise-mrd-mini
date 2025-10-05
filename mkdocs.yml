@@ -1,108 +1,85 @@
-site_name: Precise MRD
-site_description: ctDNA/UMI MRD simulator + caller with deterministic error modeling
-site_url: https://precise-mrd.github.io/precise-mrd-mini/
-repo_url: https://github.com/precise-mrd/precise-mrd-mini
-repo_name: precise-mrd/precise-mrd-mini
+site_name: Precise MRD - Detection Limit Analytics
+site_description: ctDNA/UMI MRD pipeline with formal detection limit analytics and contamination robustness
+site_url: https://altalanta.github.io/precise-mrd-mini/
+repo_url: https://github.com/altalanta/precise-mrd-mini
+repo_name: altalanta/precise-mrd-mini
+edit_uri: edit/main/docs/
+
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - Evaluation: evaluation.md
+  - Contamination Analysis: contamination.md
+  - Statistical Validation: statistical-validation.md
+  - Reproducibility: reproducibility.md
+  - API Reference: api-reference.md
 
 theme:
   name: material
   palette:
-    - scheme: default
+    # Palette toggle for light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
       primary: blue
-      accent: light blue
+      accent: indigo
       toggle:
         icon: material/brightness-7
         name: Switch to dark mode
-    - scheme: slate
+    # Palette toggle for dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
       primary: blue
-      accent: light blue
+      accent: indigo
       toggle:
         icon: material/brightness-4
         name: Switch to light mode
   features:
-    - navigation.sections
     - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.path
     - navigation.top
-    - navigation.tracking
     - search.highlight
     - search.share
-    - toc.follow
     - content.code.copy
     - content.code.annotate
 
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: google
+            show_root_heading: true
+            show_root_toc_entry: false
+
 markdown_extensions:
-  - admonition
-  - pymdownx.details
-  - pymdownx.superfences
   - pymdownx.highlight:
       anchor_linenums: true
   - pymdownx.inlinehilite
   - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.tabbed:
       alternate_style: true
-  - pymdownx.arithmex:
-      generic: true
+  - pymdownx.details
+  - admonition
   - attr_list
   - md_in_html
   - tables
   - footnotes
-  - toc:
-      permalink: true
-
-plugins:
-  - search
-  - gen-files:
-      scripts:
-        - docs/gen_ref_pages.py
-  - literate-nav:
-      nav_file: SUMMARY.md
-  - section-index
-  - mkdocstrings:
-      handlers:
-        python:
-          import:
-            - https://docs.python.org/3/objects.inv
-            - https://numpy.org/doc/stable/objects.inv
-            - https://pandas.pydata.org/docs/objects.inv
-          options:
-            docstring_style: google
-            merge_init_into_class: true
-            show_submodules: false
-
-nav:
-  - Home: index.md
-  - Getting Started:
-    - quickstart.md
-    - installation.md
-  - CLI Guide:
-    - cli/index.md
-    - cli/simulate.md
-    - cli/call.md
-    - cli/report.md
-    - cli/validate.md
-    - cli/benchmark.md
-  - Methods:
-    - methods/index.md
-    - methods/umi-consensus.md
-    - methods/error-modeling.md
-    - methods/statistical-tests.md
-    - methods/lod-estimation.md
-  - API Reference: reference/
-  - assumptions.md
-  - contributing.md
-
-extra:
-  version:
-    provider: mike
-  social:
-    - icon: fontawesome/brands/github
-      link: https://github.com/precise-mrd/precise-mrd-mini
-    - icon: fontawesome/brands/python
-      link: https://pypi.org/project/precise-mrd/
-
-extra_css:
-  - assets/extra.css
+  - pymdownx.arithmatex:
+      generic: true
 
 extra_javascript:
   - https://polyfill.io/v3/polyfill.min.js?features=es6
   - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/altalanta/precise-mrd-mini

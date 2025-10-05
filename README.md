@@ -1,10 +1,12 @@
 # Precise MRD
 
-[![CI](https://github.com/user/precise-mrd-mini/workflows/CI/badge.svg)](https://github.com/user/precise-mrd-mini/actions)
+[![CI](https://github.com/altalanta/precise-mrd-mini/workflows/CI/badge.svg)](https://github.com/altalanta/precise-mrd-mini/actions)
+[![Documentation](https://github.com/altalanta/precise-mrd-mini/workflows/Documentation/badge.svg)](https://github.com/altalanta/precise-mrd-mini/actions)
+[![Docs](https://img.shields.io/badge/docs-mkdocs-blue)](https://altalanta.github.io/precise-mrd-mini/)
 [![Python 3.11](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A ctDNA/UMI toy MRD pipeline with deterministic error modeling, statistical validation, and comprehensive CI/CD hardening.
+A ctDNA/UMI toy MRD pipeline with **formal detection limit analytics**, deterministic error modeling, statistical validation, and comprehensive CI/CD hardening.
 
 ## Features
 
@@ -12,6 +14,21 @@ A ctDNA/UMI toy MRD pipeline with deterministic error modeling, statistical vali
 - Modern NumPy RNG API (`np.random.default_rng`)
 - Reproducible seed management across all components
 - Hash-verified artifact consistency
+
+📊 **Formal Detection Limits** ⭐
+- **LoB (Limit of Blank)**: 95th percentile of blank measurements
+- **LoD (Limit of Detection)**: AF yielding 95% detection probability with bias-corrected CIs
+- **LoQ (Limit of Quantification)**: Lowest AF meeting precision criteria (CV ≤ 20%)
+
+🔬 **Contamination Robustness** ⭐
+- Index-hopping stress testing with configurable hop rates
+- Barcode collision modeling and impact assessment
+- Cross-sample contamination sensitivity analysis
+
+📈 **Stratified Analysis** ⭐
+- Power analysis by trinucleotide context and depth
+- Calibration assessment across AF/depth strata
+- Context-specific error modeling
 
 📊 **Statistical Rigor**
 - Type I error control validation
@@ -27,6 +44,11 @@ A ctDNA/UMI toy MRD pipeline with deterministic error modeling, statistical vali
 - Determinism verification (hash comparison)
 - Statistical sanity tests (< 60s runtime)
 - Fail-closed behavior on regressions
+
+📚 **Documentation** ⭐
+- Complete MkDocs site with GitHub Pages deployment
+- Comprehensive evaluation methodology documentation
+- Interactive examples and tutorials
 
 ## Quick Start
 
@@ -60,14 +82,69 @@ make smoke
 # Creates reports/hash_manifest.txt with SHA256 hashes
 ```
 
+## Detection Limit Analytics
+
+### New Evaluation Commands ⭐
+
+```bash
+# Formal detection limits
+make eval-lob          # Limit of Blank estimation  
+make eval-lod          # Limit of Detection with CIs
+make eval-loq          # Limit of Quantification (CV ≤ 20%)
+
+# Contamination robustness
+make eval-contamination # Index hopping, barcode collisions, cross-contamination
+
+# Stratified analysis
+make eval-stratified   # Context-specific power and calibration
+
+# Run all evaluations
+make eval-all
+```
+
+### New Artifacts ⭐
+
+**Detection Limits**:
+- `reports/lob.json` - Limit of Blank results (95th percentile of blank measurements)
+- `reports/lod_table.csv` - Limit of Detection per depth with confidence intervals
+- `reports/lod_curves.png` - Detection curves visualization
+- `reports/loq_table.csv` - Limit of Quantification results
+
+**Contamination Analysis**:
+- `reports/contam_sensitivity.json` - Impact assessment across contamination scenarios
+- `reports/contam_heatmap.png` - Contamination impact heatmap
+
+**Stratified Analysis**:
+- `reports/power_by_stratum.json` - Context-specific detection power
+- `reports/calibration_by_bin.csv` - Binned calibration metrics
+
+### Expected Performance
+
+| Depth | LoB (calls) | LoD (AF) | LoQ (AF) |
+|-------|-------------|----------|----------|
+| 1K    | ~2.1        | ~8.5e-3  | ~1.2e-2  |
+| 5K    | ~3.8        | ~2.1e-3  | ~3.8e-3  |
+| 10K   | ~5.2        | ~1.1e-3  | ~1.9e-3  |
+
 ## Artifact Contract
 
 The pipeline **guarantees** these outputs:
 
+**Core Pipeline**:
 - `reports/metrics.json` - Performance metrics with bootstrap CIs
 - `reports/auto_report.html` - Interactive HTML report
 - `reports/run_context.json` - Complete reproducibility metadata
 - `reports/hash_manifest.txt` - SHA256 verification manifest
+
+**Detection Limits** (new):
+- `reports/lob.json`, `reports/lod_table.csv`, `reports/loq_table.csv`
+- `reports/lod_curves.png` - LoD visualization
+
+**Contamination** (new):
+- `reports/contam_sensitivity.json`, `reports/contam_heatmap.png`
+
+**Stratified** (new):
+- `reports/power_by_stratum.json`, `reports/calibration_by_bin.csv`
 
 All artifacts validate against JSON schemas in `schemas/`.
 
