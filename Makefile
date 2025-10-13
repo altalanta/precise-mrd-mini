@@ -14,6 +14,8 @@ help:
 	@echo "  lint          - Run code linting (ruff + mypy)"
 	@echo "  format        - Format code with black and isort"
 	@echo "  smoke         - Run fast end-to-end pipeline"
+	@echo "  fastq         - Process real FASTQ file with UMIs"
+	@echo "  power-analysis - Run advanced statistical power analysis"
 	@echo "  determinism   - Run determinism verification"
 	@echo "  stat-sanity   - Run statistical sanity tests"
 	@echo "  clean-safe    - Clean generated artifacts safely"
@@ -64,6 +66,18 @@ smoke:
 	@echo "Running smoke test..."
 	@mkdir -p data/smoke reports
 	$(PYTHON) -m precise_mrd.cli smoke --seed 7 --out data/smoke --config configs/smoke.yaml
+
+# Run FASTQ test - process real FASTQ file
+fastq:
+	@echo "Running FASTQ test..."
+	@mkdir -p data/fastq reports
+	$(PYTHON) -m precise_mrd.cli fastq --seed 7 --fastq data/test.fastq --out data/fastq --config configs/fastq.yaml --max-reads 100
+
+# Run power analysis for statistical validation
+power-analysis:
+	@echo "Running advanced statistical power analysis..."
+	@mkdir -p reports
+	$(PYTHON) -m precise_mrd.cli power-analysis --seed 7 --config configs/smoke.yaml --allele-frequencies "0.001,0.01,0.1" --depths "1000,5000,10000" --target-power 0.8 --target-af 0.001
 	@echo "Running basic detection limit checks..."
 	$(PYTHON) -c "
 	from precise_mrd.config import load_config

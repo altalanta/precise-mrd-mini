@@ -44,14 +44,25 @@ class LODConfig:
 
 
 @dataclass
+class FASTQConfig:
+    """Configuration for FASTQ file processing."""
+    input_path: str
+    max_reads: Optional[int] = None
+    umi_pattern: Optional[str] = None
+    quality_threshold: int = 20
+    min_family_size: int = 3
+
+
+@dataclass
 class PipelineConfig:
     """Main pipeline configuration."""
     run_id: str
     seed: int
-    simulation: SimulationConfig
     umi: UMIConfig
     stats: StatsConfig
     lod: LODConfig
+    simulation: Optional[SimulationConfig] = None
+    fastq: Optional[FASTQConfig] = None
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert config to dictionary."""
