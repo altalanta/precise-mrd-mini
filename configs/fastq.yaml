@@ -1,0 +1,27 @@
+run_id: "fastq_test"
+seed: 7
+
+# FASTQ file configuration
+fastq:
+  input_path: "data/test.fastq.gz"
+  max_reads: null  # Process all reads
+  quality_threshold: 20
+  min_family_size: 3
+
+# UMI processing configuration
+umi:
+  min_family_size: 3
+  max_family_size: 1000
+  quality_threshold: 20
+  consensus_threshold: 0.6
+
+# Statistical testing configuration
+stats:
+  test_type: "poisson"
+  alpha: 0.05
+  fdr_method: "benjamini_hochberg"
+
+# Limit of Detection configuration
+lod:
+  detection_threshold: 0.95
+  confidence_level: 0.95

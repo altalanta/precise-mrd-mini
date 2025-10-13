@@ -9,6 +9,7 @@ from .simulate import simulate_reads
 from .collapse import collapse_umis
 from .call import call_mrd
 from .error_model import fit_error_model
+from .fastq import process_fastq_to_dataframe, detect_umi_format
 
 # Configuration and I/O
 from .config import PipelineConfig, load_config, dump_config
@@ -25,9 +26,11 @@ __all__ = [
     "__version__",
     # Core pipeline
     "simulate_reads",
-    "collapse_umis", 
+    "collapse_umis",
     "call_mrd",
     "fit_error_model",
+    "process_fastq_to_dataframe",
+    "detect_umi_format",
     # Configuration
     "PipelineConfig",
     "load_config",
