@@ -3,7 +3,6 @@
   "title": "Precise MRD Run Context Schema",
   "type": "object",
   "required": [
-    "schema_version",
     "seed",
     "timestamp",
     "config_hash",
@@ -11,10 +10,6 @@
     "python_version"
   ],
   "properties": {
-    "schema_version": {
-      "type": "string",
-      "enum": ["1.0.0"]
-    },
     "seed": {
       "type": "integer",
       "description": "Random seed used for run"

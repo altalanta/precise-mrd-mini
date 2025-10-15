@@ -69,7 +69,7 @@ def config_hash(config: PipelineConfig) -> str:
 
 ```bash
 # Verify identical results across runs
-precise-mrd determinism --out-dir data/determinism
+make determinism
 ```
 
 This runs the same analysis twice and compares SHA256 hashes:
@@ -84,7 +84,7 @@ e7f8g9h0i1j2... reports/auto_report.html
 
 ```bash
 # Generate hash manifest
-precise-mrd smoke --out-dir data/contracts
+make smoke
 cat reports/hash_manifest.txt
 
 # Example output:
@@ -93,22 +93,13 @@ cat reports/hash_manifest.txt
 # u1v2w3x4y5z6a7b8c9d0  reports/run_context.json
 ```
 
-Programmatic validation is available via:
-
-```python
-from pathlib import Path
-from precise_mrd.validation import validate_artifacts
-
-validate_artifacts(Path("reports"))
-```
-
 ### Complete Reproduction
 
 ```bash
 # Reproduce exact results from configuration
 git checkout <commit_sha>
-uv sync --extra dev --extra docs
-precise-mrd smoke --seed 7 --out-dir data/smoke
+make setup
+make smoke SEED=7
 sha256sum -c reports/hash_manifest.txt  # Should all pass
 ```
 
@@ -120,7 +111,6 @@ Every analysis generates complete run context:
 
 ```json
 {
-  "schema_version": "1.0.0",
   "seed": 7,
   "timestamp": "2024-10-05T14:30:00.000Z",
   "config_hash": "a1b2c3d4e5f6",
@@ -137,7 +127,7 @@ Every analysis generates complete run context:
   "cli_args": {
     "command": "smoke",
     "seed": 7,
-    "config_run_id": "smoke_test"
+    "config": "configs/smoke.yaml"
   },
   "execution_time_seconds": 127.3
 }
