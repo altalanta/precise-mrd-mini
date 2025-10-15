@@ -298,11 +298,9 @@ class LODAnalyzer:
         
         # Save LoB results
         if self.lob_results:
-            lob_payload = dict(self.lob_results)
-            lob_payload["schema_version"] = "1.0.0"
             lob_path = output_path / "lob.json"
             with open(lob_path, 'w') as f:
-                json.dump(lob_payload, f, indent=2)
+                json.dump(self.lob_results, f, indent=2)
             print(f"LoB results saved to {lob_path}")
         
         # Save LoD results

@@ -288,13 +288,11 @@ class StratifiedAnalyzer:
         
         # Save power analysis results
         if self.power_results:
-            power_payload = dict(self.power_results)
-            power_payload["schema_version"] = "1.0.0"
             power_path = output_path / "power_by_stratum.json"
             with open(power_path, 'w') as f:
-                json.dump(power_payload, f, indent=2)
+                json.dump(self.power_results, f, indent=2)
             print(f"Stratified power results saved to {power_path}")
-
+        
         # Save calibration results
         if self.calibration_results:
             # Save as CSV for easier analysis
@@ -304,11 +302,9 @@ class StratifiedAnalyzer:
             print(f"Calibration by bin results saved to {calib_path}")
             
             # Also save as JSON
-            calibration_payload = dict(self.calibration_results)
-            calibration_payload["schema_version"] = "1.0.0"
             calib_json_path = output_path / "calibration_by_bin.json"
             with open(calib_json_path, 'w') as f:
-                json.dump(calibration_payload, f, indent=2)
+                json.dump(self.calibration_results, f, indent=2)
 
 
 def run_stratified_analysis(config: PipelineConfig,

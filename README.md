@@ -52,13 +52,14 @@ A ctDNA/UMI toy MRD pipeline with **formal detection limit analytics**, determin
 
 ## Quick Start
 
-**3-command demo** (deterministic, <5 minutes):
-
 ```bash
-make setup     # Install dependencies and package
-make smoke     # Run fast end-to-end pipeline  
-make determinism  # Verify identical hashes across runs
+uv sync --extra dev --extra docs   # Install locked dependencies
+precise-mrd smoke                  # Run fast deterministic pipeline
+precise-mrd determinism            # Verify hash-stable artifacts
 ```
+
+Prefer Makefiles? `make setup`, `make smoke`, and `make determinism` wrap the
+same CLI entry points for backwards compatibility.
 
 ## Determinism & Reproducibility
 
@@ -71,15 +72,15 @@ make determinism  # Verify identical hashes across runs
 ### Verification Commands
 
 ```bash
-# Verify determinism (should show identical hashes)
-make determinism
+# Verify determinism (identical hash manifest across runs)
+precise-mrd determinism --out-dir data/determinism
 
-# Run statistical validation tests
-make stat-sanity
+# Run statistical validation tests (fast set)
+pytest -q
 
-# Generate hash manifest
-make smoke
-# Creates reports/hash_manifest.txt with SHA256 hashes
+# Generate hash manifest for downstream comparison
+precise-mrd smoke --out-dir data/contracts
+cat reports/hash_manifest.txt
 ```
 
 ## Detection Limit Analytics
@@ -88,18 +89,15 @@ make smoke
 
 ```bash
 # Formal detection limits
-make eval-lob          # Limit of Blank estimation  
-make eval-lod          # Limit of Detection with CIs
-make eval-loq          # Limit of Quantification (CV ≤ 20%)
+precise-mrd eval-lob --n-blank 50
+precise-mrd eval-lod --replicates 25
+precise-mrd eval-loq --replicates 25
 
 # Contamination robustness
-make eval-contamination # Index hopping, barcode collisions, cross-contamination
+precise-mrd eval-contamination
 
 # Stratified analysis
-make eval-stratified   # Context-specific power and calibration
-
-# Run all evaluations
-make eval-all
+precise-mrd eval-stratified
 ```
 
 ### New Artifacts ⭐
@@ -131,9 +129,9 @@ make eval-all
 The pipeline **guarantees** these outputs:
 
 **Core Pipeline**:
-- `reports/metrics.json` - Performance metrics with bootstrap CIs
+- `reports/metrics.json` - Performance metrics with bootstrap CIs (`schema_version` pinned)
 - `reports/auto_report.html` - Interactive HTML report
-- `reports/run_context.json` - Complete reproducibility metadata
+- `reports/run_context.json` - Complete reproducibility metadata (`schema_version` pinned)
 - `reports/hash_manifest.txt` - SHA256 verification manifest
 
 **Detection Limits** (new):
@@ -146,7 +144,8 @@ The pipeline **guarantees** these outputs:
 **Stratified** (new):
 - `reports/power_by_stratum.json`, `reports/calibration_by_bin.csv`
 
-All artifacts validate against JSON schemas in `schemas/`.
+All JSON artifacts carry explicit schema versions and are validated via
+`precise_mrd.validation.validate_artifacts` (JSON Schema + Pandera contracts).
 
 ### Example Run Context
 

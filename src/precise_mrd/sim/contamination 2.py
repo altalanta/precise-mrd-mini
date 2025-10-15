@@ -372,11 +372,9 @@ class ContaminationSimulator:
         output_path.mkdir(exist_ok=True)
         
         # Save contamination sensitivity results
-        contam_payload = dict(self.contamination_results)
-        contam_payload["schema_version"] = "1.0.0"
         contam_path = output_path / "contam_sensitivity.json"
         with open(contam_path, 'w') as f:
-            json.dump(contam_payload, f, indent=2)
+            json.dump(self.contamination_results, f, indent=2)
         print(f"Contamination sensitivity results saved to {contam_path}")
         
         # Generate contamination heatmap

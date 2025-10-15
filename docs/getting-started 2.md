@@ -17,9 +17,10 @@ git clone https://github.com/altalanta/precise-mrd-mini.git
 cd precise-mrd-mini
 ```
 
-2. **Install the locked environment**:
+2. **Install the package**:
 ```bash
-uv sync --extra dev --extra docs
+make setup
+# This runs: python -m pip install -e .[dev]
 ```
 
 3. **Verify installation**:
@@ -29,14 +30,14 @@ precise-mrd --help
 
 ## Quick Start
 
-### Three CLI commands
+### 3-Command Demo
 
 The fastest way to see Precise MRD in action:
 
 ```bash
-uv sync --extra dev --extra docs
-precise-mrd smoke --out-dir data/smoke
-precise-mrd determinism --out-dir data/determinism
+make setup     # Install dependencies and package
+make smoke     # Run fast end-to-end pipeline  
+make determinism  # Verify identical hashes across runs
 ```
 
 This will:
@@ -47,7 +48,7 @@ This will:
 
 ### Understanding the Output
 
-After running `precise-mrd smoke`, check the `reports/` directory:
+After running `make smoke`, check the `reports/` directory:
 
 ```bash
 ls reports/
@@ -66,26 +67,23 @@ Precise MRD provides several CLI commands:
 
 ```bash
 # Basic pipeline
-precise-mrd smoke --seed 7 --out-dir data/smoke
+precise-mrd smoke --seed 7 --out data/smoke
 
-# Determinism verification
-precise-mrd determinism --seed 7 --out-dir data/determinism
-
-# Detection limit analysis (defaults read from config)
-precise-mrd eval-lob --n-blank 50
-precise-mrd eval-lod --replicates 25
-precise-mrd eval-loq --replicates 25
+# Detection limit analysis
+precise-mrd eval-lob --n-blank-runs 100 --seed 7
+precise-mrd eval-lod --af-range 1e-4,1e-2 --depths 1000,5000,10000 --seed 7  
+precise-mrd eval-loq --cv-threshold 0.20 --seed 7
 
 # Contamination testing
-precise-mrd eval-contamination
+precise-mrd eval-contamination --hop-rates 0.0,0.001,0.005,0.01 --seed 7
 
 # Stratified analysis
-precise-mrd eval-stratified
+precise-mrd eval-stratified --contexts CpG,CHG,CHH,NpN --seed 7
 ```
 
 ### Configuration
 
-Analyses are configured via YAML files. Minimal smoke config:
+Analyses are configured via YAML files in the `configs/` directory:
 
 ```yaml
 # configs/smoke.yaml
@@ -120,33 +118,41 @@ lod:
 
 1. **Limit of Blank (LoB)**:
 ```bash
-precise-mrd eval-lob --n-blank 50 --seed 7
+precise-mrd eval-lob --n-blank-runs 100 --seed 7
 # Output: reports/lob.json
 ```
 
 2. **Limit of Detection (LoD)**:
 ```bash
-precise-mrd eval-lod --replicates 25 --seed 7
+precise-mrd eval-lod --af-range 1e-4,1e-2 --depths 1000,5000,10000 --seed 7
 # Outputs: reports/lod_table.csv, reports/lod_curves.png
 ```
 
 3. **Limit of Quantification (LoQ)**:
 ```bash
-precise-mrd eval-loq --replicates 25 --seed 7
+precise-mrd eval-loq --cv-threshold 0.20 --seed 7
 # Output: reports/loq_table.csv
 ```
 
 ### Contamination Analysis
 
 ```bash
-precise-mrd eval-contamination --seed 7
+precise-mrd eval-contamination \
+    --hop-rates 0.0,0.001,0.002,0.005,0.01 \
+    --collision-rates 0.0,0.0001,0.0005,0.001 \
+    --cross-contam 0.0,0.01,0.05,0.1 \
+    --seed 7
 # Outputs: reports/contam_sensitivity.json, reports/contam_heatmap.png
 ```
 
 ### Stratified Analysis
 
 ```bash
-precise-mrd eval-stratified --seed 7
+precise-mrd eval-stratified \
+    --contexts CpG,CHG,CHH,NpN \
+    --af-values 0.001,0.005,0.01,0.05 \
+    --depths 1000,5000,10000 \
+    --seed 7
 # Outputs: reports/power_by_stratum.json, reports/calibration_by_bin.csv
 ```
 

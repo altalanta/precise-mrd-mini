@@ -2,6 +2,7 @@
 
 ARG PYTHON_VERSION=3.11
 ARG UV_VERSION=0.4.23
+ARG CUDA_VERSION=12.1.0
 
 FROM python:${PYTHON_VERSION}-slim AS builder
 ARG UV_VERSION
@@ -13,13 +14,14 @@ COPY pyproject.toml uv.lock README.md ./
 COPY src ./src
 RUN uv sync --frozen
 
-FROM python:${PYTHON_VERSION}-slim AS runtime
+FROM nvidia/cuda:${CUDA_VERSION}-runtime-ubuntu22.04 AS runtime
 ARG UV_VERSION
 ENV UV_SYSTEM_PYTHON=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/opt/venv/bin:$PATH"
 WORKDIR /app
-RUN apt-get update && apt-get install -y --no-install-recommends make && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends python3 python3-venv python3-pip make && rm -rf /var/lib/apt/lists/*
+RUN ln -s /usr/bin/python3 /usr/local/bin/python && ln -s /usr/bin/pip3 /usr/local/bin/pip
 RUN useradd --create-home --system mrd
 COPY --from=builder /app/.venv /opt/venv
 COPY pyproject.toml uv.lock README.md ./

@@ -8,6 +8,7 @@ from scipy import stats
 from typing import Optional, Tuple
 
 from .config import PipelineConfig
+from .advanced_stats import MLVariantCaller
 
 
 def poisson_test(observed: int, expected: float) -> float:
@@ -83,20 +84,64 @@ def call_mrd(
     error_model_df: pd.DataFrame,
     config: PipelineConfig,
     rng: np.random.Generator,
-    output_path: Optional[str] = None
+    output_path: Optional[str] = None,
+    use_ml_calling: bool = False
 ) -> pd.DataFrame:
-    """Perform MRD calling with statistical testing.
-    
+    """Perform MRD calling with statistical testing or ML-based approaches.
+
     Args:
         collapsed_df: DataFrame with collapsed UMI data
         error_model_df: DataFrame with error model
         config: Pipeline configuration
         rng: Seeded random number generator
         output_path: Optional path to save results
-        
+        use_ml_calling: Whether to use ML-based variant calling
+
     Returns:
         DataFrame with MRD calls and statistics
     """
+
+    # Use ML-based variant calling if requested
+    if use_ml_calling:
+        print("  Using ML-based variant calling...")
+        ml_caller = MLVariantCaller(config)
+
+        # Train the model on available data
+        training_results = ml_caller.train_classifier(collapsed_df, rng)
+
+        # Get ML predictions
+        ml_probabilities = ml_caller.predict_variants(collapsed_df)
+
+        # Convert probabilities to binary calls using a threshold
+        # Use median probability as threshold for balanced classification
+        threshold = np.median(ml_probabilities)
+        ml_calls = (ml_probabilities > threshold).astype(int)
+
+        # Create results DataFrame
+        results = []
+        for i, (_, row) in enumerate(collapsed_df.iterrows()):
+            results.append({
+                'sample_id': row['sample_id'],
+                'family_id': row['family_id'],
+                'family_size': row['family_size'],
+                'quality_score': row['quality_score'],
+                'consensus_agreement': row['consensus_agreement'],
+                'passes_quality': row['passes_quality'],
+                'passes_consensus': row['passes_consensus'],
+                'is_variant': ml_calls[i],
+                'p_value': 1.0 - ml_probabilities[i],  # Convert probability to p-value-like score
+                'ml_probability': ml_probabilities[i],
+                'ml_threshold': threshold,
+                'calling_method': 'ml_classifier',
+                'config_hash': config.config_hash()
+            })
+
+        df = pd.DataFrame(results)
+
+        if output_path:
+            df.to_parquet(output_path, index=False)
+
+        return df
     
     stats_config = config.stats
     
