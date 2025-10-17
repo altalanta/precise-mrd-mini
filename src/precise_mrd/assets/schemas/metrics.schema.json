@@ -1,0 +1,82 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Precise MRD Metrics Schema",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "roc_auc",
+    "average_precision",
+    "detected_cases",
+    "total_cases",
+    "calibration"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "enum": ["1.0.0"]
+    },
+    "roc_auc": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "ROC AUC score"
+    },
+    "roc_auc_ci": {
+      "type": "object",
+      "required": ["mean", "lower", "upper", "std"],
+      "properties": {
+        "mean": {"type": "number", "minimum": 0, "maximum": 1},
+        "lower": {"type": "number", "minimum": 0, "maximum": 1},
+        "upper": {"type": "number", "minimum": 0, "maximum": 1},
+        "std": {"type": "number", "minimum": 0}
+      }
+    },
+    "average_precision": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Average precision score"
+    },
+    "average_precision_ci": {
+      "type": "object",
+      "required": ["mean", "lower", "upper", "std"],
+      "properties": {
+        "mean": {"type": "number", "minimum": 0, "maximum": 1},
+        "lower": {"type": "number", "minimum": 0, "maximum": 1},
+        "upper": {"type": "number", "minimum": 0, "maximum": 1},
+        "std": {"type": "number", "minimum": 0}
+      }
+    },
+    "brier_score": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Brier score for calibration"
+    },
+    "detected_cases": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of detected positive cases"
+    },
+    "total_cases": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Total number of cases"
+    },
+    "calibration": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["bin", "lower", "upper", "count", "event_rate", "confidence"],
+        "properties": {
+          "bin": {"type": "integer", "minimum": 0},
+          "lower": {"type": "number", "minimum": 0, "maximum": 1},
+          "upper": {"type": "number", "minimum": 0, "maximum": 1},
+          "count": {"type": "integer", "minimum": 0},
+          "event_rate": {"type": "number", "minimum": 0, "maximum": 1},
+          "confidence": {"type": "number", "minimum": 0, "maximum": 1}
+        }
+      }
+    }
+  },
+  "additionalProperties": true
+}

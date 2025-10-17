@@ -1,0 +1,23 @@
+run_id: "smoke_test"
+seed: 7
+
+simulation:
+  allele_fractions: [0.01, 0.001, 0.0001]
+  umi_depths: [1000, 5000]
+  n_replicates: 10
+  n_bootstrap: 100
+
+umi:
+  min_family_size: 3
+  max_family_size: 1000
+  quality_threshold: 20
+  consensus_threshold: 0.6
+
+stats:
+  test_type: "poisson"
+  alpha: 0.05
+  fdr_method: "benjamini_hochberg"
+
+lod:
+  detection_threshold: 0.95
+  confidence_level: 0.95
