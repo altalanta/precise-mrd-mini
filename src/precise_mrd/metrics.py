@@ -12,6 +12,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 
 from .config import PipelineConfig
 from .advanced_stats import AdvancedConfidenceIntervals
+from .statistical_validation import CrossValidator, UncertaintyQuantifier, StatisticalTester, RobustnessAnalyzer, ModelValidator
 
 
 def roc_auc_score(y_true: np.ndarray, y_score: np.ndarray) -> float:
@@ -170,9 +171,10 @@ def calculate_metrics(
     n_bootstrap: int = 1000,
     n_jobs: int = -1,
     config: Optional[PipelineConfig] = None,
-    use_advanced_ci: bool = False
+    use_advanced_ci: bool = False,
+    run_validation: bool = False
 ) -> Dict[str, Any]:
-    """Calculate comprehensive performance metrics with optional advanced confidence intervals.
+    """Calculate comprehensive performance metrics with optional advanced confidence intervals and validation.
 
     Args:
         calls_df: DataFrame with MRD calls
@@ -181,6 +183,7 @@ def calculate_metrics(
         n_jobs: Number of parallel jobs for bootstrap (-1 for all cores)
         config: Pipeline configuration for advanced statistics
         use_advanced_ci: Whether to use advanced confidence interval methods
+        run_validation: Whether to run comprehensive statistical validation
 
     Returns:
         Dictionary with all metrics
@@ -261,6 +264,45 @@ def calculate_metrics(
     # Brier score
     brier_score = float(np.mean((y_score - y_true) ** 2))
     
+    # Add statistical validation if requested
+    validation_results = {}
+    if run_validation and config:
+        print("  Running comprehensive statistical validation...")
+
+        # Cross-validation for model performance
+        if 'ml_probability' in calls_df.columns:
+            X = calls_df[['family_size', 'quality_score', 'consensus_agreement']].values
+            y = calls_df['is_variant'].values
+
+            # Simple model function for demonstration
+            def simple_model_func(X_train, y_train):
+                from sklearn.ensemble import RandomForestClassifier
+                model = RandomForestClassifier(n_estimators=10, random_state=config.seed)
+                model.fit(X_train, y_train)
+                return model
+
+            cv = CrossValidator(config)
+            cv_results = cv.k_fold_cross_validation(X, y, simple_model_func, k_folds=3)
+            validation_results['cross_validation'] = cv_results
+
+        # Calibration analysis
+        if 'ml_probability' in calls_df.columns:
+            calibrator = ModelValidator(config)
+            calibration_results = calibrator.calibration_analysis(y_true, calls_df['ml_probability'].values)
+            validation_results['calibration_analysis'] = calibration_results
+
+        # Robustness analysis
+        robustness = RobustnessAnalyzer(config)
+        robustness_results = robustness.bootstrap_robustness(calls_df, n_bootstrap=50)
+        validation_results['robustness_analysis'] = robustness_results
+
+        # Uncertainty quantification
+        uncertainty = UncertaintyQuantifier(config)
+        # Example: quantify uncertainty in variant rate estimates
+        variant_rates = calls_df['is_variant'].values
+        uncertainty_results = uncertainty.bayesian_uncertainty([variant_rates])
+        validation_results['uncertainty_quantification'] = uncertainty_results
+
     return {
         "roc_auc": float(roc_auc),
         "roc_auc_ci": roc_ci,
@@ -269,5 +311,6 @@ def calculate_metrics(
         "brier_score": brier_score,
         "detected_cases": detected_cases,
         "total_cases": total_cases,
-        "calibration": calibration
+        "calibration": calibration,
+        "statistical_validation": validation_results if validation_results else None
     }

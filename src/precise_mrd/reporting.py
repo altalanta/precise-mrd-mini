@@ -124,7 +124,10 @@ def render_report(
     
     # Get allele fractions from data
     if len(calls_df) > 0:
-        allele_fractions = sorted(calls_df['allele_fraction'].unique())
+        if 'allele_fraction' in calls_df.columns:
+            allele_fractions = sorted(calls_df['allele_fraction'].unique())
+        else:
+            allele_fractions = []  # No allele fractions for real data
         af_str = ', '.join(f"{af:.4f}" for af in allele_fractions)
     else:
         af_str = "None"

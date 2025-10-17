@@ -26,6 +26,8 @@ from .sim.contamination import run_contamination_stress_test
 from .simulate import simulate_reads
 from .utils import PipelineIO
 from .validation import assert_hashes_stable, validate_artifacts
+from .performance import get_performance_report, reset_performance_monitor
+from .statistical_validation import CrossValidator, StatisticalTester, RobustnessAnalyzer
 
 DEFAULT_CONFIG_NAME = "smoke.yaml"
 REPORTS_DIR = Path("reports")
@@ -98,7 +100,7 @@ def _run_smoke_pipeline(config: PipelineConfig, seed: int, output_dir: Path) -> 
     report_path = reports_dir / "auto_report.html"
     manifest_path = reports_dir / "hash_manifest.txt"
 
-    reads_df = simulate_reads(config, rng, output_path=str(reads_path))
+    reads_df = simulate_reads(config, rng, output_path=str(reads_path), use_cache=True, chunked_processing=True)
     collapsed_df = collapse_umis(reads_df, config, rng, output_path=str(collapsed_path))
     error_model_df = fit_error_model(
         collapsed_df,
@@ -122,6 +124,7 @@ def _run_smoke_pipeline(config: PipelineConfig, seed: int, output_dir: Path) -> 
         n_bootstrap=config.simulation.n_bootstrap if config.simulation else 100,
         config=config,
         use_advanced_ci=False,
+        run_validation=False,
     )
     metrics = _json_ready(metrics)
 
@@ -400,6 +403,114 @@ def create_minimal_config(seed: int) -> PipelineConfig:
             confidence_level=0.95,
         ),
     )
+
+
+@main.command("performance")
+@click.option("--reset", is_flag=True, help="Reset performance monitoring data")
+@click.pass_obj
+def performance_cmd(ctx: CLIContext, reset: bool) -> None:
+    """Show performance monitoring statistics."""
+    if reset:
+        reset_performance_monitor()
+        click.echo("Performance monitoring data reset.")
+        return
+
+    report = get_performance_report()
+
+    click.echo("Performance Report:")
+    click.echo("=" * 50)
+
+    # Timing statistics
+    if report["timing_statistics"]:
+        click.echo("\nTiming Statistics:")
+        for func_name, stats in report["timing_statistics"].items():
+            click.echo(f"  {func_name}:")
+            click.echo(f"    Calls: {stats['calls']}")
+            click.echo(f"    Total: {stats['total_time']:.3f}s")
+            click.echo(f"    Average: {stats['avg_time']:.3f}s")
+            click.echo(f"    Min: {stats['min_time']:.3f}s")
+            click.echo(f"    Max: {stats['max_time']:.3f}s")
+
+    # Memory usage
+    click.echo(f"\nPeak Memory Usage: {report['peak_memory_mb']:.1f} MB")
+    click.echo(f"Functions Tracked: {report['total_functions_tracked']}")
+
+    click.echo(json.dumps(report, indent=2, default=str))
+
+
+@main.command("validate-model")
+@click.option("--data-path", type=click.Path(path_type=Path), help="Path to processed data for validation")
+@click.option("--k-folds", default=5, type=int, help="Number of cross-validation folds")
+@click.option("--scoring", default="roc_auc", type=str, help="Scoring metric for validation")
+@click.pass_obj
+def validate_model_cmd(ctx: CLIContext, data_path: Optional[Path], k_folds: int, scoring: str) -> None:
+    """Run comprehensive model validation and statistical testing."""
+    config = _load_pipeline_config(ctx.config_override, ctx.seed)
+    rng = set_global_seed(ctx.seed, deterministic_ops=True)
+
+    if data_path is None:
+        # Use default smoke data
+        data_path = DATA_ROOT / "smoke" / "smoke"
+
+    # Load data for validation
+    try:
+        calls_df = pd.read_parquet(data_path / "mrd_calls.parquet")
+        collapsed_df = pd.read_parquet(data_path / "collapsed_umis.parquet")
+    except FileNotFoundError:
+        click.echo(f"Error: Required data files not found in {data_path}")
+        return
+
+    click.echo(f"🔬 Running model validation on {len(calls_df)} samples...")
+
+    # Cross-validation
+    cv = CrossValidator(config)
+    if 'ml_probability' in calls_df.columns:
+        X = calls_df[['family_size', 'quality_score', 'consensus_agreement']].values
+        y = calls_df['is_variant'].values
+
+        def simple_model_func(X_train, y_train):
+            from sklearn.ensemble import RandomForestClassifier
+            model = RandomForestClassifier(n_estimators=10, random_state=config.seed)
+            model.fit(X_train, y_train)
+            return model
+
+        cv_results = cv.k_fold_cross_validation(X, y, simple_model_func, k_folds=k_folds, scoring=scoring)
+        click.echo(f"  Cross-validation {scoring}: {cv_results['mean_score']:.3f} ± {cv_results['std_score']:.3f}")
+
+    # Robustness analysis
+    robustness = RobustnessAnalyzer(config)
+    robustness_results = robustness.bootstrap_robustness(calls_df, n_bootstrap=100)
+    click.echo(f"  Robustness analysis: {len(robustness_results['robustness_statistics'])} metrics evaluated")
+
+    # Statistical testing
+    tester = StatisticalTester(config)
+    # Example: Multiple testing correction on p-values
+    if 'p_value' in calls_df.columns:
+        p_values = calls_df['p_value'].values
+        correction_results = tester.multiple_testing_correction(p_values, method='benjamini_hochberg')
+        click.echo(f"  Multiple testing: {correction_results['n_rejected']}/{correction_results['n_tests']} tests rejected")
+
+    # Save validation results
+    validation_results = {
+        'cross_validation': cv_results if 'cv_results' in locals() else None,
+        'robustness_analysis': robustness_results,
+        'multiple_testing': correction_results if 'correction_results' in locals() else None,
+        'parameters': {
+            'k_folds': k_folds,
+            'scoring': scoring,
+            'n_samples': len(calls_df)
+        }
+    }
+
+    output_path = REPORTS_DIR / "model_validation.json"
+    PipelineIO.save_json(validation_results, str(output_path))
+    click.echo(f"📊 Validation results saved to {output_path}")
+
+    click.echo(json.dumps({
+        'stage': 'validate-model',
+        'validation_file': str(output_path),
+        'samples_validated': len(calls_df)
+    }, indent=2))
 
 
 def cli() -> None:  # pragma: no cover - convenience shim

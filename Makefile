@@ -5,7 +5,7 @@ UV ?= uv
 REPORTS_DIR := reports
 
 .PHONY: setup fmt lint type test smoke determinism eval-lob eval-lod eval-loq \
-        eval-contamination eval-stratified docs clean build release
+        eval-contamination eval-stratified validate-model performance docs clean build release
 
 setup:
 	$(PYTHON) -m pip install --upgrade pip $(UV)
@@ -43,6 +43,12 @@ eval-contamination:
 
 eval-stratified:
 	$(UV) run precise-mrd eval-stratified
+
+performance:
+	$(UV) run precise-mrd performance
+
+validate-model:
+	$(UV) run precise-mrd validate-model
 
 docs:
 	$(UV) run mkdocs build --strict
