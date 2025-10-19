@@ -20,7 +20,13 @@ dependencies = [
     "pyyaml==6.0.2",
     "click==8.1.7",
     "jsonschema==4.23.0",
-    "pandera[io]==0.19.3"
+    "pandera[io]==0.19.3",
+    "dask[dataframe]==2024.8.2",
+    "distributed==2024.8.2",
+    "matplotlib==3.9.2",
+    "seaborn==0.13.2",
+    "xgboost==2.1.1",
+    "lightgbm==4.5.0"
 ]
 
 [project.optional-dependencies]
