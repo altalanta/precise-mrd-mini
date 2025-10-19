@@ -1,512 +1,581 @@
-"""Advanced statistical modeling for enhanced MRD analysis."""
+"""Advanced statistical methods and machine learning for MRD variant calling."""
 
 from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-from scipy import stats
-from scipy.special import betaln, gammaln
-from sklearn.ensemble import RandomForestClassifier, IsolationForest
-from sklearn.model_selection import cross_val_score
+from typing import Dict, List, Tuple, Optional, Any, Union
+from sklearn.model_selection import cross_val_score, StratifiedKFold
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.svm import SVC
 from sklearn.preprocessing import StandardScaler
-from typing import Dict, List, Tuple, Optional, Any
+from sklearn.feature_selection import SelectKBest, f_classif, mutual_info_classif
+from sklearn.pipeline import Pipeline
+from sklearn.metrics import roc_auc_score, average_precision_score, classification_report
 import warnings
 
 from .config import PipelineConfig
 
 
-class BayesianErrorModel:
-    """Bayesian hierarchical model for background error rates."""
+class FeatureEngineer:
+    """Automated feature engineering for variant calling."""
 
     def __init__(self, config: PipelineConfig):
-        self.config = config
-        self.trinucleotide_contexts = [
-            'AAA', 'AAC', 'AAG', 'AAT',
-            'ACA', 'ACC', 'ACG', 'ACT',
-            'AGA', 'AGC', 'AGG', 'AGT',
-            'ATA', 'ATC', 'ATG', 'ATT',
-            'CAA', 'CAC', 'CAG', 'CAT',
-            'CCA', 'CCC', 'CCG', 'CCT',
-            'CGA', 'CGC', 'CGG', 'CGT',
-            'CTA', 'CTC', 'CTG', 'CTT',
-            'GAA', 'GAC', 'GAG', 'GAT',
-            'GCA', 'GCC', 'GCG', 'GCT',
-            'GGA', 'GGC', 'GGG', 'GGT',
-            'GTA', 'GTC', 'GTG', 'GTT',
-            'TAA', 'TAC', 'TAG', 'TAT',
-            'TCA', 'TCC', 'TCG', 'TCT',
-            'TGA', 'TGC', 'TGG', 'TGT',
-            'TTA', 'TTC', 'TTG', 'TTT'
-        ]
-
-    def fit_bayesian_model(self,
-                          collapsed_df: pd.DataFrame,
-                          rng: np.random.Generator) -> Dict[str, Any]:
-        """Fit Bayesian hierarchical model to error rates.
+        """Initialize feature engineer.
 
         Args:
-            collapsed_df: Collapsed UMI data
-            rng: Random number generator
-
-        Returns:
-            Dictionary with Bayesian error model parameters
+            config: Pipeline configuration
         """
-        # Extract negative control samples (low allele fraction)
-        negative_samples = collapsed_df[collapsed_df['allele_fraction'] <= 0.0001]
-
-        if len(negative_samples) == 0:
-            # Fallback to simple model if no negative controls
-            return self._fit_simple_model(collapsed_df, rng)
-
-        # Group by trinucleotide context
-        context_error_rates = {}
-
-        for context in self.trinucleotide_contexts:
-            # For now, use a simplified approach
-            # In a full implementation, this would use MCMC or variational inference
-            context_samples = negative_samples  # Simplified - would filter by context
-
-            if len(context_samples) > 0:
-                # Beta-binomial model for error rates
-                n_total = len(context_samples)
-                n_errors = int(np.sum(context_samples['is_variant']))
-
-                # Prior: Beta(1, 10) - weak prior favoring low error rates
-                alpha_prior = 1.0
-                beta_prior = 10.0
-
-                # Posterior: Beta(alpha_prior + n_errors, beta_prior + n_total - n_errors)
-                alpha_post = alpha_prior + n_errors
-                beta_post = beta_prior + n_total - n_errors
-
-                # Posterior mean and credible intervals
-                posterior_mean = alpha_post / (alpha_post + beta_post)
-                posterior_std = np.sqrt((alpha_post * beta_post) /
-                                      ((alpha_post + beta_post) ** 2 * (alpha_post + beta_post + 1)))
-
-                # 95% credible interval
-                ci_lower = stats.beta.ppf(0.025, alpha_post, beta_post)
-                ci_upper = stats.beta.ppf(0.975, alpha_post, beta_post)
-
-                context_error_rates[context] = {
-                    'error_rate': posterior_mean,
-                    'error_rate_std': posterior_std,
-                    'ci_lower': ci_lower,
-                    'ci_upper': ci_upper,
-                    'n_observations': n_total,
-                    'n_errors': n_errors,
-                    'alpha_post': alpha_post,
-                    'beta_post': beta_post
-                }
-
-        return {
-            'context_error_rates': context_error_rates,
-            'model_type': 'bayesian_hierarchical',
-            'total_contexts': len(context_error_rates),
-            'total_observations': len(negative_samples),
-            'config_hash': self.config.config_hash
-        }
-
-    def _fit_simple_model(self, collapsed_df: pd.DataFrame, rng: np.random.Generator) -> Dict[str, Any]:
-        """Fallback simple error model."""
-        # Simplified fallback when no negative controls available
-        return {
-            'context_error_rates': {
-                context: {
-                    'error_rate': rng.uniform(1e-5, 1e-3),
-                    'error_rate_std': rng.uniform(1e-6, 1e-4),
-                    'ci_lower': 0.0,
-                    'ci_upper': rng.uniform(1e-4, 1e-2),
-                    'n_observations': 0,
-                    'n_errors': 0,
-                    'alpha_post': 1.0,
-                    'beta_post': 10.0
-                } for context in self.trinucleotide_contexts
-            },
-            'model_type': 'simple_fallback',
-            'total_contexts': len(self.trinucleotide_contexts),
-            'total_observations': 0,
-            'config_hash': self.config.config_hash
-        }
-
-
-class MLVariantCaller:
-    """Machine learning-based variant calling."""
-
-    def __init__(self, config: PipelineConfig):
         self.config = config
-        self.feature_scaler = StandardScaler()
-        self.variant_classifier = RandomForestClassifier(
-            n_estimators=100,
-            random_state=config.seed,
-            n_jobs=1  # Deterministic
-        )
-        self.outlier_detector = IsolationForest(
-            random_state=config.seed,
-            contamination=0.1
-        )
+        self.feature_names = []
 
-    def extract_features(self, collapsed_df: pd.DataFrame) -> np.ndarray:
-        """Extract features for ML-based variant calling.
+    def extract_features(self, collapsed_df: pd.DataFrame) -> Tuple[pd.DataFrame, List[str]]:
+        """Extract features from collapsed UMI data.
 
         Args:
-            collapsed_df: Collapsed UMI data
+            collapsed_df: DataFrame with collapsed UMI data
 
         Returns:
-            Feature matrix for machine learning
+            Tuple of (feature_matrix, feature_names)
         """
         features = []
 
-        for _, row in collapsed_df.iterrows():
-            # Basic features
-            family_size = row['family_size']
-            quality_score = row['quality_score']
-            consensus_agreement = row['consensus_agreement']
+        # Basic features from existing data
+        basic_features = [
+            'family_size',
+            'quality_score',
+            'consensus_agreement',
+            'allele_fraction'
+        ]
 
-            # Derived features
-            quality_per_read = quality_score / max(family_size, 1)
-            agreement_per_read = consensus_agreement / max(family_size, 1)
+        for feature in basic_features:
+            if feature in collapsed_df.columns:
+                features.append(collapsed_df[feature].values.reshape(-1, 1))
 
-            # Statistical features
-            # In a real implementation, these would be more sophisticated
-            feature_vector = [
-                family_size,
-                quality_score,
-                consensus_agreement,
-                quality_per_read,
-                agreement_per_read,
-                family_size * quality_score,  # Interaction term
-                np.log1p(family_size),  # Log transform
-                1.0 if family_size >= 3 else 0.0,  # Binary feature
-            ]
+        # Derived features
+        if 'family_size' in collapsed_df.columns and 'quality_score' in collapsed_df.columns:
+            # Interaction features
+            family_quality_ratio = collapsed_df['family_size'] / (collapsed_df['quality_score'] + 1)
+            features.append(family_quality_ratio.values.reshape(-1, 1))
 
-            features.append(feature_vector)
+        if 'consensus_agreement' in collapsed_df.columns and 'allele_fraction' in collapsed_df.columns:
+            # Confidence-weighted allele fraction
+            confidence_af = collapsed_df['consensus_agreement'] * collapsed_df['allele_fraction']
+            features.append(confidence_af.values.reshape(-1, 1))
 
-        return np.array(features)
+        # Combine all features
+        if features:
+            X = np.hstack(features)
+            self.feature_names = basic_features[:len(features)]
 
-    def train_classifier(self,
-                        collapsed_df: pd.DataFrame,
-                        rng: np.random.Generator) -> Dict[str, Any]:
-        """Train ML classifier for variant calling.
+            # Add derived feature names
+            if len(features) > len(basic_features):
+                self.feature_names.extend(['family_quality_ratio', 'confidence_af'])
+
+        else:
+            # Fallback if no features available
+            X = np.zeros((len(collapsed_df), 1))
+            self.feature_names = ['dummy_feature']
+
+        return pd.DataFrame(X, columns=self.feature_names), self.feature_names
+
+    def select_features(self, X: pd.DataFrame, y: np.ndarray, method: str = 'mutual_info',
+                       k: int = 10) -> Tuple[pd.DataFrame, List[str]]:
+        """Select most informative features.
 
         Args:
-            collapsed_df: Training data
-            rng: Random number generator
+            X: Feature matrix
+            y: Target labels
+            method: Feature selection method ('f_classif', 'mutual_info')
+            k: Number of top features to select
 
         Returns:
-            Training results and model performance
+            Tuple of (selected_features, selected_feature_names)
         """
-        # Extract features
-        X = self.extract_features(collapsed_df)
+        if method == 'f_classif':
+            selector = SelectKBest(score_func=f_classif, k=min(k, X.shape[1]))
+        elif method == 'mutual_info':
+            selector = SelectKBest(score_func=mutual_info_classif, k=min(k, X.shape[1]))
+        else:
+            raise ValueError(f"Unknown feature selection method: {method}")
 
-        # For demonstration, create synthetic labels based on allele fraction
-        # In practice, this would use known truth data
-        y = (collapsed_df['allele_fraction'] > 0.001).astype(int)
+        X_selected = selector.fit_transform(X, y)
+        selected_features = X.columns[selector.get_support()].tolist()
 
-        # Handle edge case where all labels are the same
-        if len(np.unique(y)) < 2:
-            return {
-                'model_trained': False,
-                'reason': 'Insufficient label diversity',
-                'accuracy': 0.5,
-                'feature_importance': None,
-                'config_hash': self.config.config_hash
-            }
+        return pd.DataFrame(X_selected, columns=selected_features), selected_features
 
-        # Scale features
-        X_scaled = self.feature_scaler.fit_transform(X)
 
-        # Train classifier
-        self.variant_classifier.fit(X_scaled, y)
+class MLVariantCaller:
+    """Machine learning-based variant caller for MRD detection."""
 
-        # Cross-validation performance
-        cv_scores = cross_val_score(
-            self.variant_classifier, X_scaled, y,
-            cv=3, scoring='accuracy'
+    def __init__(self, config: PipelineConfig, model_type: str = 'ensemble'):
+        """Initialize ML variant caller.
+
+        Args:
+            config: Pipeline configuration
+            model_type: Type of ML model ('rf', 'gbm', 'svm', 'lr', 'ensemble')
+        """
+        self.config = config
+        self.model_type = model_type
+        self.models = {}
+        self.feature_engineer = FeatureEngineer(config)
+        self.scaler = StandardScaler()
+
+        # Initialize models
+        self._initialize_models()
+
+    def _initialize_models(self):
+        """Initialize ML models based on model_type."""
+        if self.model_type == 'rf':
+            self.models['rf'] = RandomForestClassifier(
+                n_estimators=100,
+                max_depth=10,
+                random_state=self.config.seed,
+                n_jobs=1  # For deterministic behavior
+            )
+        elif self.model_type == 'gbm':
+            self.models['gbm'] = GradientBoostingClassifier(
+                n_estimators=100,
+                max_depth=5,
+                random_state=self.config.seed
+            )
+        elif self.model_type == 'svm':
+            self.models['svm'] = SVC(
+                probability=True,
+                random_state=self.config.seed
+            )
+        elif self.model_type == 'lr':
+            self.models['lr'] = LogisticRegression(
+                random_state=self.config.seed,
+                max_iter=1000
+            )
+        elif self.model_type == 'ensemble':
+            # Ensemble of multiple models
+            self.models['rf'] = RandomForestClassifier(
+                n_estimators=50,
+                max_depth=8,
+                random_state=self.config.seed,
+                n_jobs=1
+            )
+            self.models['gbm'] = GradientBoostingClassifier(
+                n_estimators=50,
+                max_depth=4,
+                random_state=self.config.seed
+            )
+            self.models['lr'] = LogisticRegression(
+                random_state=self.config.seed,
+                max_iter=1000
+            )
+        else:
+            raise ValueError(f"Unknown model type: {self.model_type}")
+
+    def train_classifier(self, collapsed_df: pd.DataFrame, rng: np.random.Generator) -> Dict[str, Any]:
+        """Train the ML classifier on collapsed UMI data.
+
+        Args:
+            collapsed_df: DataFrame with collapsed UMI data
+            rng: Random number generator for reproducibility
+
+        Returns:
+            Dictionary with training results and performance metrics
+        """
+        print(f"  Training {self.model_type} model...")
+
+        # Extract features and labels
+        X, feature_names = self.feature_engineer.extract_features(collapsed_df)
+
+        # Use is_variant as target (or generate synthetic labels if not available)
+        if 'is_variant' in collapsed_df.columns:
+            y = collapsed_df['is_variant'].values
+        else:
+            # Generate synthetic labels based on allele fraction and quality
+            # This is a fallback for when we don't have ground truth
+            y = self._generate_synthetic_labels(collapsed_df, rng)
+
+        # Handle class imbalance
+        pos_ratio = np.mean(y)
+        print(f"  Positive class ratio: {pos_ratio:.3f}")
+
+        if pos_ratio < 0.01:  # Very imbalanced
+            print("  Using class weighting due to imbalanced data")
+            # Adjust for class imbalance
+            class_weight = {0: 1.0, 1: 1.0 / pos_ratio if pos_ratio > 0 else 2.0}
+        else:
+            class_weight = None
+
+        # Feature selection
+        X_selected, selected_features = self.feature_engineer.select_features(
+            X, y, method='mutual_info', k=min(10, X.shape[1])
         )
 
-        # Feature importance
-        feature_importance = self.variant_classifier.feature_importances_
+        print(f"  Selected {len(selected_features)} features: {selected_features}")
 
-        return {
-            'model_trained': True,
-            'cv_accuracy_mean': cv_scores.mean(),
-            'cv_accuracy_std': cv_scores.std(),
-            'feature_importance': feature_importance.tolist(),
-            'n_samples': len(X),
-            'n_features': X.shape[1],
-            'class_distribution': np.bincount(y).tolist(),
-            'config_hash': self.config.config_hash
-        }
+        # Scale features
+        X_scaled = self.scaler.fit_transform(X_selected)
 
-    def predict_variants(self, collapsed_df: pd.DataFrame) -> np.ndarray:
-        """Predict variant calls using trained ML model.
+        training_results = {}
 
-        Args:
-            collapsed_df: Data to classify
+        if self.model_type == 'ensemble':
+            # Train multiple models and ensemble them
+            ensemble_predictions = np.zeros(len(y))
+            model_weights = {}
 
-        Returns:
-            Predicted variant probabilities
-        """
-        if not hasattr(self.variant_classifier, 'estimators_'):
-            # Model not trained, return random predictions
-            return np.random.random(len(collapsed_df))
+            for model_name, model in self.models.items():
+                print(f"    Training {model_name}...")
 
-        X = self.extract_features(collapsed_df)
-        X_scaled = self.feature_scaler.transform(X)
+                # Set class weight if needed
+                if class_weight and hasattr(model, 'class_weight'):
+                    model.set_params(class_weight=class_weight)
 
-        return self.variant_classifier.predict_proba(X_scaled)[:, 1]
+                # Cross-validation for model evaluation
+                cv_scores = cross_val_score(
+                    model, X_scaled, y,
+                    cv=StratifiedKFold(n_splits=3, shuffle=True, random_state=self.config.seed),
+                    scoring='roc_auc'
+                )
 
+                print(f"    {model_name} CV AUC: {cv_scores.mean():.3f} ± {cv_scores.std():.3f}")
 
-class AdvancedConfidenceIntervals:
-    """Advanced methods for confidence interval estimation."""
+                # Train model on full data
+                model.fit(X_scaled, y)
 
-    def __init__(self, config: PipelineConfig):
-        self.config = config
+                # Get predictions for ensemble
+                if hasattr(model, 'predict_proba'):
+                    probas = model.predict_proba(X_scaled)[:, 1]
+                else:
+                    probas = model.decision_function(X_scaled)
+                    # Convert to probabilities (simple sigmoid approximation)
+                    probas = 1 / (1 + np.exp(-probas))
 
-    def bootstrap_confidence_interval(self,
-                                    data: np.ndarray,
-                                    statistic_func,
-                                    n_bootstrap: int = 1000,
-                                    rng: Optional[np.random.Generator] = None,
-                                    confidence_level: float = 0.95) -> Dict[str, float]:
-        """Enhanced bootstrap confidence intervals with bias correction.
+                # Weight by CV performance
+                weight = cv_scores.mean()
+                ensemble_predictions += weight * probas
+                model_weights[model_name] = weight
 
-        Args:
-            data: Data array
-            statistic_func: Function to compute statistic
-            n_bootstrap: Number of bootstrap samples
-            rng: Random number generator
-            confidence_level: Confidence level (e.g., 0.95)
+            # Normalize ensemble predictions
+            total_weight = sum(model_weights.values())
+            ensemble_predictions /= total_weight
 
-        Returns:
-            Dictionary with CI bounds and metadata
-        """
-        if rng is None:
-            rng = np.random.default_rng(42)
+            # Convert to binary predictions
+            threshold = np.percentile(ensemble_predictions, 100 * (1 - pos_ratio))
+            ensemble_binary = (ensemble_predictions > threshold).astype(int)
 
-        n_samples = len(data)
-        bootstrap_stats = []
-
-        for _ in range(n_bootstrap):
-            # Bootstrap sample
-            indices = rng.choice(n_samples, size=n_samples, replace=True)
-            bootstrap_sample = data[indices]
-
-            try:
-                stat = statistic_func(bootstrap_sample)
-                bootstrap_stats.append(stat)
-            except Exception:
-                continue
-
-        if not bootstrap_stats:
-            return {
-                'lower': 0.0,
-                'upper': 0.0,
-                'median': 0.0,
-                'mean': 0.0,
-                'std': 0.0,
-                'n_bootstrap': 0,
-                'method': 'failed'
+            training_results = {
+                'model_type': 'ensemble',
+                'models_trained': list(self.models.keys()),
+                'model_weights': model_weights,
+                'feature_names': selected_features,
+                'cv_scores': cv_scores,
+                'ensemble_predictions': ensemble_predictions,
+                'ensemble_binary': ensemble_binary,
+                'threshold': threshold,
+                'positive_ratio': pos_ratio
             }
 
-        bootstrap_stats = np.array(bootstrap_stats)
-
-        # Basic percentile CI
-        alpha = (1 - confidence_level) / 2
-        lower_percentile = np.percentile(bootstrap_stats, alpha * 100)
-        upper_percentile = np.percentile(bootstrap_stats, (1 - alpha) * 100)
-
-        # Bias-corrected and accelerated (BCa) CI - simplified version
-        observed_stat = statistic_func(data)
-        mean_bootstrap = np.mean(bootstrap_stats)
-        bias = mean_bootstrap - observed_stat
-
-        # Simple bias correction
-        lower_corrected = 2 * observed_stat - upper_percentile
-        upper_corrected = 2 * observed_stat - lower_percentile
-
-        return {
-            'lower': lower_corrected,
-            'upper': upper_corrected,
-            'median': np.median(bootstrap_stats),
-            'mean': mean_bootstrap,
-            'std': np.std(bootstrap_stats),
-            'bias': bias,
-            'n_bootstrap': len(bootstrap_stats),
-            'method': 'bootstrap_bca',
-            'confidence_level': confidence_level
-        }
-
-    def bayesian_confidence_interval(self,
-                                   data: np.ndarray,
-                                   prior_alpha: float = 1.0,
-                                   prior_beta: float = 1.0,
-                                   confidence_level: float = 0.95) -> Dict[str, float]:
-        """Bayesian confidence intervals using conjugate priors.
-
-        Args:
-            data: Binary data array
-            prior_alpha: Beta prior alpha parameter
-            prior_beta: Beta prior beta parameter
-            confidence_level: Confidence level
-
-        Returns:
-            Dictionary with Bayesian CI and posterior parameters
-        """
-        n_success = int(np.sum(data))
-        n_total = len(data)
-
-        # Posterior parameters
-        alpha_post = prior_alpha + n_success
-        beta_post = prior_beta + n_total - n_success
-
-        # Posterior mean
-        posterior_mean = alpha_post / (alpha_post + beta_post)
-
-        # Credible interval
-        alpha_ci = (1 - confidence_level) / 2
-        lower = stats.beta.ppf(alpha_ci, alpha_post, beta_post)
-        upper = stats.beta.ppf(1 - alpha_ci, alpha_post, beta_post)
-
-        return {
-            'lower': lower,
-            'upper': upper,
-            'mean': posterior_mean,
-            'median': stats.beta.median(alpha_post, beta_post),
-            'mode': (alpha_post - 1) / (alpha_post + beta_post - 2) if alpha_post > 1 and beta_post > 2 else posterior_mean,
-            'alpha_prior': prior_alpha,
-            'beta_prior': prior_beta,
-            'alpha_post': alpha_post,
-            'beta_post': beta_post,
-            'n_success': n_success,
-            'n_total': n_total,
-            'method': 'bayesian_beta',
-            'confidence_level': confidence_level
-        }
-
-
-class PowerAnalysis:
-    """Advanced power analysis for MRD detection."""
-
-    def __init__(self, config: PipelineConfig):
-        self.config = config
-
-    def calculate_detection_power(self,
-                                allele_frequencies: List[float],
-                                depths: List[int],
-                                n_replicates: int = 10,
-                                alpha: float = 0.05,
-                                rng: Optional[np.random.Generator] = None) -> Dict[str, Any]:
-        """Calculate statistical power for MRD detection.
-
-        Args:
-            allele_frequencies: List of allele frequencies to test
-            depths: List of sequencing depths to test
-            n_replicates: Number of replicates per condition
-            alpha: Significance level
-            rng: Random number generator
-
-        Returns:
-            Power analysis results
-        """
-        if rng is None:
-            rng = np.random.default_rng(42)
-
-        power_results = {}
-
-        for af in allele_frequencies:
-            power_results[str(af)] = {}
-
-            for depth in depths:
-                # Simulate detection under null and alternative hypotheses
-                null_detections = []
-                alt_detections = []
-
-                for _ in range(n_replicates):
-                    # Null hypothesis: no variant
-                    null_pval = rng.uniform(0, 1)
-                    null_detections.append(null_pval < alpha)
-
-                    # Alternative hypothesis: variant present
-                    # Simplified model - in practice would use actual test
-                    alt_pval = rng.beta(af * depth, (1 - af) * depth)
-                    alt_detections.append(alt_pval < alpha)
-
-                # Power calculation
-                power = np.mean(alt_detections)
-                type_i_error = np.mean(null_detections)
-
-                power_results[str(af)][str(depth)] = {
-                    'power': power,
-                    'type_i_error': type_i_error,
-                    'n_replicates': n_replicates,
-                    'expected_effect_size': af,
-                    'sequencing_depth': depth
-                }
-
-        return {
-            'power_analysis': power_results,
-            'alpha': alpha,
-            'n_replicates': n_replicates,
-            'method': 'simulation_based',
-            'config_hash': self.config.config_hash
-        }
-
-    def sample_size_calculation(self,
-                              target_power: float = 0.8,
-                              target_af: float = 0.001,
-                              alpha: float = 0.05,
-                              effect_size_ratio: float = 1.0) -> Dict[str, Any]:
-        """Calculate required sample size for target power.
-
-        Args:
-            target_power: Desired statistical power
-            target_af: Target allele frequency
-            alpha: Significance level
-            effect_size_ratio: Ratio of effect size to standard error
-
-        Returns:
-            Required sample size calculation
-        """
-        # Simplified sample size calculation
-        # In practice, this would use more sophisticated power analysis
-
-        # Z-scores for power and alpha
-        z_power = stats.norm.ppf(target_power)
-        z_alpha = stats.norm.ppf(1 - alpha / 2)
-
-        # Approximate sample size formula for proportion difference
-        p1 = target_af
-        p2 = 0.001  # Background error rate
-
-        # Handle edge case where p1 ≈ p2
-        effect_size = abs(p1 - p2)
-        if effect_size < 1e-10:
-            # Very small effect size - return large sample size
-            n_per_group = 1e6  # Large sample size for very small effects
         else:
-            # Pooled proportion
-            p_pool = (p1 + p2) / 2
+            # Single model training
+            model = list(self.models.values())[0]
+            print(f"    Training {self.model_type}...")
 
-            # Required sample size per group
-            n_per_group = (
-                (z_power + z_alpha) ** 2 *
-                2 * p_pool * (1 - p_pool) /
-                effect_size ** 2
+            if class_weight and hasattr(model, 'class_weight'):
+                model.set_params(class_weight=class_weight)
+
+            # Cross-validation
+            cv_scores = cross_val_score(
+                model, X_scaled, y,
+                cv=StratifiedKFold(n_splits=3, shuffle=True, random_state=self.config.seed),
+                scoring='roc_auc'
             )
 
-        # For sequencing depth, scale by expected coverage
-        min_depth = max(1000, int(n_per_group * 2))  # Conservative estimate
+            print(f"    CV AUC: {cv_scores.mean():.3f} ± {cv_scores.std():.3f}")
+
+            # Train on full data
+            model.fit(X_scaled, y)
+
+            # Get predictions
+            if hasattr(model, 'predict_proba'):
+                predictions = model.predict_proba(X_scaled)[:, 1]
+            else:
+                predictions = model.decision_function(X_scaled)
+                predictions = 1 / (1 + np.exp(-predictions))
+
+            training_results = {
+                'model_type': self.model_type,
+                'feature_names': selected_features,
+                'cv_scores': cv_scores,
+                'predictions': predictions,
+                'positive_ratio': pos_ratio
+            }
+
+        return training_results
+
+    def predict_variants(self, collapsed_df: pd.DataFrame) -> np.ndarray:
+        """Predict variants using trained ML model.
+
+        Args:
+            collapsed_df: DataFrame with collapsed UMI data
+
+        Returns:
+            Array of variant probabilities
+        """
+        # Extract features
+        X, _ = self.feature_engineer.extract_features(collapsed_df)
+
+        # Feature selection (use same features as training)
+        if hasattr(self, '_selected_features'):
+            X_selected = X[self._selected_features]
+        else:
+            # If not trained yet, use all features
+            X_selected = X
+
+        # Scale features
+        X_scaled = self.scaler.transform(X_selected)
+
+        if self.model_type == 'ensemble':
+            # Ensemble prediction
+            ensemble_predictions = np.zeros(X_scaled.shape[0])
+
+            for model_name, model in self.models.items():
+                if hasattr(model, 'predict_proba'):
+                    probas = model.predict_proba(X_scaled)[:, 1]
+                else:
+                    probas = model.decision_function(X_scaled)
+                    probas = 1 / (1 + np.exp(-probas))
+
+                weight = getattr(self, '_model_weights', {}).get(model_name, 1.0)
+                ensemble_predictions += weight * probas
+
+            total_weight = sum(getattr(self, '_model_weights', {}).values()) or len(self.models)
+            ensemble_predictions /= total_weight
+
+            return ensemble_predictions
+        else:
+            # Single model prediction
+            model = list(self.models.values())[0]
+            if hasattr(model, 'predict_proba'):
+                return model.predict_proba(X_scaled)[:, 1]
+            else:
+                predictions = model.decision_function(X_scaled)
+                return 1 / (1 + np.exp(-predictions))
+
+    def _generate_synthetic_labels(self, collapsed_df: pd.DataFrame, rng: np.random.Generator) -> np.ndarray:
+        """Generate synthetic labels for training when ground truth is not available.
+
+        This is a fallback method that creates reasonable synthetic labels based on
+        allele fraction and quality metrics.
+        """
+        # Use allele fraction as primary signal
+        af_signal = collapsed_df.get('allele_fraction', pd.Series([0.001] * len(collapsed_df)))
+
+        # Add noise based on quality and consensus
+        quality_factor = collapsed_df.get('quality_score', pd.Series([25] * len(collapsed_df))) / 50.0
+        consensus_factor = collapsed_df.get('consensus_agreement', pd.Series([0.8] * len(collapsed_df)))
+
+        # Combine signals
+        combined_signal = af_signal * quality_factor * consensus_factor
+
+        # Convert to binary labels with some noise
+        # Higher signal = more likely to be variant
+        probabilities = np.clip(combined_signal * 100, 0, 1)  # Scale to 0-1
+
+        # Add some randomness
+        noise = rng.normal(0, 0.1, len(probabilities))
+        noisy_probabilities = np.clip(probabilities + noise, 0, 1)
+
+        # Convert to binary labels
+        return (noisy_probabilities > 0.5).astype(int)
+
+    def evaluate_model(self, X_test: pd.DataFrame, y_test: np.ndarray) -> Dict[str, float]:
+        """Evaluate trained model on test data.
+
+        Args:
+            X_test: Test features
+            y_test: Test labels
+
+        Returns:
+            Dictionary with evaluation metrics
+        """
+        predictions = self.predict_variants(X_test)
+
+        # Convert predictions to binary for classification metrics
+        threshold = 0.5  # Default threshold
+        binary_predictions = (predictions > threshold).astype(int)
+
+        metrics = {}
+
+        # ROC AUC
+        try:
+            metrics['roc_auc'] = roc_auc_score(y_test, predictions)
+        except ValueError:
+            metrics['roc_auc'] = 0.5
+
+        # Average precision
+        try:
+            metrics['avg_precision'] = average_precision_score(y_test, predictions)
+        except ValueError:
+            metrics['avg_precision'] = np.mean(y_test)
+
+        # Classification report (convert to dict)
+        try:
+            report = classification_report(y_test, binary_predictions, output_dict=True, zero_division=0)
+            metrics.update({
+                'precision': report['weighted avg']['precision'],
+                'recall': report['weighted avg']['recall'],
+                'f1_score': report['weighted avg']['f1-score']
+            })
+        except Exception:
+            metrics.update({'precision': 0.0, 'recall': 0.0, 'f1_score': 0.0})
+
+        return metrics
+
+    def get_feature_importance(self) -> Dict[str, float]:
+        """Get feature importance scores from trained model.
+
+        Returns:
+            Dictionary mapping feature names to importance scores
+        """
+        if not self.models:
+            return {}
+
+        # For ensemble, average importance across models
+        if self.model_type == 'ensemble':
+            total_importance = {}
+            for model_name, model in self.models.items():
+                if hasattr(model, 'feature_importances_'):
+                    importance = model.feature_importances_
+                    for i, feat_name in enumerate(getattr(self, '_selected_features', [])):
+                        total_importance[feat_name] = total_importance.get(feat_name, 0) + importance[i]
+
+            # Normalize by number of models
+            for feat_name in total_importance:
+                total_importance[feat_name] /= len(self.models)
+
+            return total_importance
+        else:
+            # Single model
+            model = list(self.models.values())[0]
+            if hasattr(model, 'feature_importances_'):
+                selected_features = getattr(self, '_selected_features', [])
+                return {
+                    feat_name: importance
+                    for feat_name, importance in zip(selected_features, model.feature_importances_)
+                }
+            elif hasattr(model, 'coef_'):
+                # For linear models
+                selected_features = getattr(self, '_selected_features', [])
+                return {
+                    feat_name: abs(coef)
+                    for feat_name, coef in zip(selected_features, model.coef_[0])
+                }
+
+        return {}
+
+
+class AdaptiveThresholdOptimizer:
+    """Adaptive threshold optimization for ML-based variant calling."""
+
+    def __init__(self, config: PipelineConfig):
+        """Initialize threshold optimizer.
+
+        Args:
+            config: Pipeline configuration
+        """
+        self.config = config
+
+    def optimize_threshold(self, predictions: np.ndarray, true_labels: np.ndarray,
+                          metric: str = 'f1') -> float:
+        """Find optimal threshold for variant calling.
+
+        Args:
+            predictions: Predicted probabilities
+            true_labels: True labels (if available)
+            metric: Metric to optimize ('f1', 'precision', 'recall')
+
+        Returns:
+            Optimal threshold value
+        """
+        if true_labels is None:
+            # If no ground truth, use statistical approach
+            # Use median or 95th percentile based on expected false positive rate
+            expected_fpr = self.config.stats.alpha
+            if metric == 'f1':
+                # For F1 optimization, use a threshold that balances precision and recall
+                return np.percentile(predictions, 100 * (1 - expected_fpr * 2))
+            else:
+                return np.percentile(predictions, 100 * (1 - expected_fpr))
+
+        # If we have ground truth, optimize threshold
+        thresholds = np.linspace(0.01, 0.99, 50)
+        best_threshold = 0.5
+        best_score = 0.0
+
+        for threshold in thresholds:
+            binary_predictions = (predictions > threshold).astype(int)
+
+            if metric == 'f1':
+                try:
+                    from sklearn.metrics import f1_score
+                    score = f1_score(true_labels, binary_predictions, zero_division=0)
+                except:
+                    score = 0.0
+            elif metric == 'precision':
+                try:
+                    from sklearn.metrics import precision_score
+                    score = precision_score(true_labels, binary_predictions, zero_division=0)
+                except:
+                    score = 0.0
+            elif metric == 'recall':
+                try:
+                    from sklearn.metrics import recall_score
+                    score = recall_score(true_labels, binary_predictions, zero_division=0)
+                except:
+                    score = 0.0
+            else:
+                score = 0.0
+
+            if score > best_score:
+                best_score = score
+                best_threshold = threshold
+
+        return best_threshold
+
+    def get_confidence_intervals(self, predictions: np.ndarray, threshold: float,
+                               n_bootstrap: int = 100) -> Dict[str, float]:
+        """Calculate confidence intervals for predictions using bootstrap.
+
+        Args:
+            predictions: Predicted probabilities
+            threshold: Decision threshold
+            n_bootstrap: Number of bootstrap samples
+
+        Returns:
+            Dictionary with confidence intervals
+        """
+        binary_predictions = (predictions > threshold).astype(int)
+        n_positives = np.sum(binary_predictions)
+
+        if n_positives == 0:
+            return {'lower': 0.0, 'upper': 0.0, 'mean': 0.0}
+
+        # Bootstrap confidence intervals
+        bootstrap_proportions = []
+
+        for _ in range(n_bootstrap):
+            # Sample with replacement
+            indices = np.random.choice(len(predictions), size=len(predictions), replace=True)
+            boot_predictions = predictions[indices]
+            boot_binary = (boot_predictions > threshold).astype(int)
+            boot_proportion = np.mean(boot_binary)
+            bootstrap_proportions.append(boot_proportion)
+
+        bootstrap_proportions = np.array(bootstrap_proportions)
+        lower_ci = np.percentile(bootstrap_proportions, 2.5)
+        upper_ci = np.percentile(bootstrap_proportions, 97.5)
+        mean_proportion = np.mean(bootstrap_proportions)
 
         return {
-            'required_sample_size_per_group': n_per_group,
-            'required_sequencing_depth': min_depth,
-            'target_power': target_power,
-            'target_allele_frequency': target_af,
-            'significance_level': alpha,
-            'assumed_background_rate': p2,
-            'effect_size_ratio': effect_size_ratio,
-            'method': 'approximate_normal',
-            'config_hash': self.config.config_hash
+            'lower': lower_ci,
+            'upper': upper_ci,
+            'mean': mean_proportion
         }

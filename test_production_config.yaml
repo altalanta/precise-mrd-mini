@@ -1,0 +1,39 @@
+run_id: from_production_template
+seed: 7
+umi:
+  min_family_size: 5
+  max_family_size: 10000
+  quality_threshold: 25
+  consensus_threshold: 0.7
+stats:
+  test_type: poisson
+  alpha: 0.01
+  fdr_method: benjamini_hochberg
+lod:
+  detection_threshold: 0.95
+  confidence_level: 0.99
+simulation:
+  allele_fractions:
+  - 0.1
+  - 0.01
+  - 0.001
+  - 0.0001
+  - 1.0e-05
+  umi_depths:
+  - 1000
+  - 5000
+  - 10000
+  - 25000
+  n_replicates: 50
+  n_bootstrap: 1000
+fastq: null
+config_version: 2.0.0
+parent_config: null
+template: production
+tags:
+- production
+- comprehensive
+- high_accuracy
+description: 'Generated from template: production'
+created_at: '2025-10-18T18:40:55.290760'
+last_modified: '2025-10-18T18:40:55.290760'
