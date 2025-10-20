@@ -5,6 +5,7 @@ pyproject.toml
 src/precise_mrd/__init__ 2.py
 src/precise_mrd/__init__.py
 src/precise_mrd/advanced_stats.py
+src/precise_mrd/api.py
 src/precise_mrd/cache.py
 src/precise_mrd/call 2.py
 src/precise_mrd/call.py
@@ -14,6 +15,8 @@ src/precise_mrd/collapse 2.py
 src/precise_mrd/collapse.py
 src/precise_mrd/config 2.py
 src/precise_mrd/config.py
+src/precise_mrd/dashboard.py
+src/precise_mrd/deep_learning_models.py
 src/precise_mrd/error_model 2.py
 src/precise_mrd/error_model.py
 src/precise_mrd/fastq.py

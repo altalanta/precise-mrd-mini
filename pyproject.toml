@@ -26,7 +26,21 @@ dependencies = [
     "matplotlib==3.9.2",
     "seaborn==0.13.2",
     "xgboost==2.1.1",
-    "lightgbm==4.5.0"
+    "lightgbm==4.5.0",
+    "torch==2.4.1",
+    "torchvision==0.19.1",
+    "torchaudio==2.4.1",
+    "transformers==4.44.2",
+    "tokenizers==0.19.1",
+    "fastapi==0.115.0",
+    "uvicorn[standard]==0.31.1",
+    "pydantic==2.9.2",
+    "python-multipart==0.0.9",
+    "aiofiles==24.1.0",
+    "httpx==0.27.2",
+    "streamlit==1.39.0",
+    "plotly==5.24.1",
+    "streamlit-plotly-events==0.0.6"
 ]
 
 [project.optional-dependencies]
