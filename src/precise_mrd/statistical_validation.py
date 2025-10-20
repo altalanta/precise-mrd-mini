@@ -688,3 +688,4 @@ class ModelValidator:
             'is_well_calibrated': ece < 0.05
         }
 
+

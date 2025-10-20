@@ -579,3 +579,4 @@ class AdaptiveThresholdOptimizer:
             'upper': upper_ci,
             'mean': mean_proportion
         }
+

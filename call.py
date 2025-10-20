@@ -9,6 +9,7 @@ from typing import Optional, Tuple
 
 from .config import PipelineConfig
 from .ml_models import GradientBoostedVariantCaller, EnsembleVariantCaller
+from .deep_learning_models import CNNLSTMModel, HybridModel, DeepLearningVariantCaller
 
 
 def poisson_test(observed: int, expected: float) -> float:
@@ -90,7 +91,9 @@ def call_mrd(
     rng: np.random.Generator,
     output_path: Optional[str] = None,
     use_ml_calling: bool = False,
-    ml_model_type: str = 'ensemble'
+    ml_model_type: str = 'ensemble',
+    use_deep_learning: bool = False,
+    dl_model_type: str = 'cnn_lstm'
 ) -> pd.DataFrame:
     """Perform MRD calling with statistical testing or ML-based approaches.
 
@@ -102,6 +105,8 @@ def call_mrd(
         output_path: Optional path to save results
         use_ml_calling: Whether to use ML-based variant calling
         ml_model_type: Type of ML model to use ('ensemble', 'xgboost', 'lightgbm', 'gbm')
+        use_deep_learning: Whether to use deep learning-based variant calling
+        dl_model_type: Type of deep learning model to use ('cnn_lstm', 'hybrid', 'transformer')
 
     Returns:
         DataFrame with MRD calls and statistics
@@ -156,10 +161,52 @@ def call_mrd(
 
         df = results_df
 
-        if output_path:
-            df.to_parquet(output_path, index=False)
+    # Use deep learning-based variant calling if requested
+    if use_deep_learning:
+        print(f"  Using deep learning-based variant calling ({dl_model_type})...")
 
-        return df
+        # Initialize deep learning caller
+        dl_caller = DeepLearningVariantCaller(config, dl_model_type)
+
+        # Train the model
+        training_results = dl_caller.train_model(collapsed_df, rng)
+
+        # Get deep learning predictions
+        dl_probabilities = dl_caller.predict_variants(collapsed_df)
+
+        # Use optimal threshold from training
+        optimal_threshold = training_results.get('optimal_threshold', np.median(dl_probabilities))
+        dl_calls = (dl_probabilities > optimal_threshold).astype(int)
+
+        # Get model summary for reporting
+        model_summary = dl_caller.get_model_summary()
+
+        print(f"  Deep learning model trained: {model_summary}")
+        print(f"  Optimal threshold: {optimal_threshold:.3f}")
+
+        # Create results DataFrame (vectorized)
+        results_df = pd.DataFrame({
+            'sample_id': collapsed_df['sample_id'],
+            'family_id': collapsed_df['family_id'],
+            'family_size': collapsed_df['family_size'],
+            'quality_score': collapsed_df['quality_score'],
+            'consensus_agreement': collapsed_df['consensus_agreement'],
+            'passes_quality': collapsed_df['passes_quality'],
+            'passes_consensus': collapsed_df['passes_consensus'],
+            'is_variant': dl_calls,
+            'p_value': 1.0 - dl_probabilities,  # Convert probability to p-value-like score
+            'dl_probability': dl_probabilities,
+            'dl_threshold': optimal_threshold,
+            'calling_method': f'dl_{dl_model_type}',
+            'config_hash': config.config_hash()
+        })
+
+        df = results_df
+
+    if output_path:
+        df.to_parquet(output_path, index=False)
+
+    return df
     
     stats_config = config.stats
     

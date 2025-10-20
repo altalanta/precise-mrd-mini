@@ -30,6 +30,7 @@ from .performance import get_performance_report, reset_performance_monitor
 from .statistical_validation import CrossValidator, StatisticalTester, RobustnessAnalyzer
 from .cache import PipelineCache
 from .config import ConfigValidator, PredefinedTemplates, PipelineConfig, ConfigVersionManager, dump_config
+from .api import create_api_app, run_api_server
 
 DEFAULT_CONFIG_NAME = "smoke.yaml"
 REPORTS_DIR = Path("reports")
@@ -43,6 +44,7 @@ class CLIContext:
     seed: int
     config_override: Optional[Path]
     ml_model_type: str
+    dl_model_type: str
 
 
 def _load_pipeline_config(config_option: Optional[Path], seed: int) -> PipelineConfig:
@@ -88,7 +90,7 @@ def _json_ready(payload: Dict[str, Any]) -> Dict[str, Any]:
     return _convert(payload)
 
 
-def _run_smoke_pipeline(config: PipelineConfig, seed: int, output_dir: Path, use_parallel: bool = False, n_partitions: int = None, use_cache: bool = True, cache_dir: Path = None, use_ml_calling: bool = False, ml_model_type: str = 'ensemble') -> Dict[str, Path]:
+def _run_smoke_pipeline(config: PipelineConfig, seed: int, output_dir: Path, use_parallel: bool = False, n_partitions: int = None, use_cache: bool = True, cache_dir: Path = None, use_ml_calling: bool = False, ml_model_type: str = 'ensemble', use_deep_learning: bool = False, dl_model_type: str = 'cnn_lstm') -> Dict[str, Path]:
     """Execute the smoke pipeline and persist canonical artifacts."""
     rng = set_global_seed(seed, deterministic_ops=True)
     stage_dir = PipelineIO.ensure_dir(output_dir)
@@ -135,6 +137,8 @@ def _run_smoke_pipeline(config: PipelineConfig, seed: int, output_dir: Path, use
         output_path=str(calls_path),
         use_ml_calling=use_ml_calling,
         ml_model_type=ml_model_type,
+        use_deep_learning=use_deep_learning,
+        dl_model_type=dl_model_type,
     )
 
     metrics = calculate_metrics(
@@ -159,6 +163,12 @@ def _run_smoke_pipeline(config: PipelineConfig, seed: int, output_dir: Path, use
             "seed": seed,
             "config_run_id": config.run_id,
             "output_dir": str(stage_dir),
+        },
+        "ml_processing": {
+            "ml_calling_enabled": use_ml_calling,
+            "ml_model_type": ml_model_type,
+            "deep_learning_enabled": use_deep_learning,
+            "dl_model_type": dl_model_type,
         },
         "parallel_processing": {
             "enabled": use_parallel,
@@ -214,10 +224,18 @@ def _ensure_reports_dir() -> Path:
     show_default=True,
     help="Type of ML model to use for variant calling.",
 )
+@click.option(
+    "--dl-model",
+    "dl_model_type",
+    type=click.Choice(['cnn_lstm', 'hybrid', 'transformer']),
+    default='cnn_lstm',
+    show_default=True,
+    help="Type of deep learning model to use for variant calling.",
+)
 @click.pass_context
-def main(ctx: click.Context, seed: int, config_path: Optional[Path], ml_model_type: str) -> None:
+def main(ctx: click.Context, seed: int, config_path: Optional[Path], ml_model_type: str, dl_model_type: str) -> None:
     """Precise MRD: deterministic MRD analytics with hardened artifact contracts."""
-    ctx.obj = CLIContext(seed=seed, config_override=config_path, ml_model_type=ml_model_type)
+    ctx.obj = CLIContext(seed=seed, config_override=config_path, ml_model_type=ml_model_type, dl_model_type=dl_model_type)
 
 
 @main.command("smoke")
@@ -256,11 +274,24 @@ def main(ctx: click.Context, seed: int, config_path: Optional[Path], ml_model_ty
     is_flag=True,
     help="Use machine learning-based variant calling instead of statistical tests.",
 )
+@click.option(
+    "--deep-learning",
+    is_flag=True,
+    help="Use deep learning-based variant calling instead of statistical tests.",
+)
+@click.option(
+    "--dl-model",
+    "dl_model_type",
+    type=click.Choice(['cnn_lstm', 'hybrid', 'transformer']),
+    default='cnn_lstm',
+    show_default=True,
+    help="Type of deep learning model to use for variant calling.",
+)
 @click.pass_obj
-def smoke_cmd(ctx: CLIContext, out_dir: Path, parallel: bool, n_partitions: int, cache_dir: Path, use_cache: bool, ml_calling: bool) -> None:
+def smoke_cmd(ctx: CLIContext, out_dir: Path, parallel: bool, n_partitions: int, cache_dir: Path, use_cache: bool, ml_calling: bool, deep_learning: bool, dl_model_type: str) -> None:
     """Run the fast deterministic smoke pipeline."""
     config = _load_pipeline_config(ctx.config_override, ctx.seed)
-    artifacts = _run_smoke_pipeline(config, ctx.seed, out_dir, use_parallel=parallel, n_partitions=n_partitions, use_cache=use_cache, cache_dir=cache_dir, use_ml_calling=ml_calling, ml_model_type=ctx.ml_model_type)
+    artifacts = _run_smoke_pipeline(config, ctx.seed, out_dir, use_parallel=parallel, n_partitions=n_partitions, use_cache=use_cache, cache_dir=cache_dir, use_ml_calling=ml_calling, ml_model_type=ctx.ml_model_type, use_deep_learning=deep_learning, dl_model_type=ctx.dl_model_type)
     validate_artifacts(REPORTS_DIR)
 
     click.echo(
@@ -291,13 +322,13 @@ def determinism_cmd(ctx: CLIContext, out_dir: Path) -> None:
     _ensure_reports_dir()
 
     cache_dir = out_dir / "cache"
-    first_artifacts = _run_smoke_pipeline(config, ctx.seed, out_dir / "run1", use_parallel=True, n_partitions=2, use_cache=True, cache_dir=cache_dir, use_ml_calling=True, ml_model_type=ctx.ml_model_type)
+    first_artifacts = _run_smoke_pipeline(config, ctx.seed, out_dir / "run1", use_parallel=True, n_partitions=2, use_cache=True, cache_dir=cache_dir, use_ml_calling=True, ml_model_type=ctx.ml_model_type, use_deep_learning=True, dl_model_type=ctx.dl_model_type)
     validate_artifacts(REPORTS_DIR)
     manifest_path = Path(first_artifacts["manifest"])
     snapshot_manifest = manifest_path.with_name("hash_manifest_run1.txt")
     shutil.copy2(manifest_path, snapshot_manifest)
 
-    second_artifacts = _run_smoke_pipeline(config, ctx.seed, out_dir / "run2", use_parallel=True, n_partitions=2, use_cache=True, cache_dir=cache_dir, use_ml_calling=True, ml_model_type=ctx.ml_model_type)
+    second_artifacts = _run_smoke_pipeline(config, ctx.seed, out_dir / "run2", use_parallel=True, n_partitions=2, use_cache=True, cache_dir=cache_dir, use_ml_calling=True, ml_model_type=ctx.ml_model_type, use_deep_learning=True, dl_model_type=ctx.dl_model_type)
     validate_artifacts(REPORTS_DIR)
 
     assert_hashes_stable(snapshot_manifest, Path(second_artifacts["manifest"]))
@@ -864,6 +895,26 @@ def config_version_cmd(current: bool, migrate: str) -> None:
         click.echo("Use --help for more information.")
 
 
+@main.command("api")
+@click.option("--host", default="0.0.0.0", show_default=True, help="Host to bind the API server to.")
+@click.option("--port", default=8000, show_default=True, type=int, help="Port to bind the API server to.")
+@click.option("--reload", is_flag=True, help="Enable auto-reload for development.")
+def api_cmd(host: str, port: int, reload: bool) -> None:
+    """Start the REST API server for the MRD pipeline."""
+    click.echo("🚀 Starting Precise MRD Pipeline API Server...")
+    click.echo(f"📡 Server will be available at: http://{host}:{port}")
+    click.echo(f"📚 API Documentation: http://{host}:{port}/docs")
+    click.echo(f"🔄 ReDoc: http://{host}:{port}/redoc")
+
+    try:
+        run_api_server(host=host, port=port, reload=reload)
+    except KeyboardInterrupt:
+        click.echo("\n🛑 API server stopped.")
+    except Exception as e:
+        click.echo(f"❌ Failed to start API server: {e}")
+        raise click.ClickException(f"API server startup failed: {e}")
+
+
 @main.command("validate-model")
 @click.option("--data-path", type=click.Path(path_type=Path), help="Path to processed data for validation")
 @click.option("--k-folds", default=5, type=int, help="Number of cross-validation folds")
@@ -1010,4 +1061,41 @@ Model Ranking:")
 
     click.echo(f"
 📊 Models Tracked: {ml_report[\"n_models_tracked\"]}")
+
+from .dashboard import run_dashboard
+
+
+@main.command("dashboard")
+@click.option("--host", default="0.0.0.0", show_default=True, help="Host to bind the dashboard to.")
+@click.option("--port", default=8501, show_default=True, type=int, help="Port to bind the dashboard to.")
+@click.option("--debug", is_flag=True, help="Enable debug mode for dashboard development.")
+def dashboard_cmd(host: str, port: int, debug: bool) -> None:
+    """Launch the interactive web dashboard for the MRD pipeline."""
+    click.echo("🌐 Starting Precise MRD Pipeline Dashboard...")
+    click.echo(f"📊 Dashboard will be available at: http://{host}:{port}")
+    click.echo("🎛️  Features include job monitoring, configuration management, and result visualization")
+
+    try:
+        import streamlit.web.cli as stcli
+        import sys
+
+        # Set Streamlit configuration
+        sys.argv = ["streamlit", "run", "src/precise_mrd/dashboard.py"]
+
+        if debug:
+            sys.argv.append("--server.headless")
+            sys.argv.append("true")
+            sys.argv.append("--server.port")
+            sys.argv.append(str(port))
+            sys.argv.append("--server.address")
+            sys.argv.append(host)
+
+        stcli.main()
+
+    except KeyboardInterrupt:
+        click.echo("
+🛑 Dashboard stopped.")
+    except Exception as e:
+        click.echo(f"❌ Failed to start dashboard: {e}")
+        raise click.ClickException(f"Dashboard startup failed: {e}")
 

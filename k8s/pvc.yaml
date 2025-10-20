@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mrd-data-pvc
+  labels:
+    app: precise-mrd
+    component: data
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 100Gi
+  storageClassName: nfs-storage  # Adjust based on your cluster setup
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mrd-results-pvc
+  labels:
+    app: precise-mrd
+    component: results
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 50Gi
+  storageClassName: nfs-storage  # Adjust based on your cluster setup

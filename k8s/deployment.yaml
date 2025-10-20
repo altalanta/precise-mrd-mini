@@ -1,0 +1,82 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: precise-mrd-api
+  labels:
+    app: precise-mrd
+    component: api
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: precise-mrd
+      component: api
+  template:
+    metadata:
+      labels:
+        app: precise-mrd
+        component: api
+    spec:
+      containers:
+      - name: api
+        image: precise-mrd-api:latest
+        envFrom:
+        - configMapRef:
+            name: mrd-api-config
+        ports:
+        - containerPort: 8000
+          name: http
+        env:
+        - name: PYTHONPATH
+          value: "/app"
+        - name: PRECISE_MRD_LOG_LEVEL
+          value: "INFO"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        volumeMounts:
+        - name: data-storage
+          mountPath: /app/data
+        - name: results-storage
+          mountPath: /app/api_results
+      volumes:
+      - name: data-storage
+        persistentVolumeClaim:
+          claimName: mrd-data-pvc
+      - name: results-storage
+        persistentVolumeClaim:
+          claimName: mrd-results-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: precise-mrd-api-service
+  labels:
+    app: precise-mrd
+    component: api
+spec:
+  selector:
+    app: precise-mrd
+    component: api
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8000
+    protocol: TCP
+  type: ClusterIP
