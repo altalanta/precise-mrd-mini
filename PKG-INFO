@@ -65,10 +65,12 @@ Requires-Dist: ruff==0.6.8; extra == "dev"
 Requires-Dist: hypothesis==6.112.1; extra == "dev"
 Requires-Dist: types-PyYAML==6.0.12.20240917; extra == "dev"
 Requires-Dist: twine==5.1.1; extra == "dev"
+Requires-Dist: dvc[s3]==3.50.0; extra == "dev"
 Provides-Extra: docs
 Requires-Dist: mkdocs-material>=9.0.0; extra == "docs"
 Requires-Dist: mkdocs-gen-files>=0.5.0; extra == "docs"
 Requires-Dist: mkdocstrings[python]>=0.24.0; extra == "docs"
+Requires-Dist: mkdocs-jupyter>=0.24.0; extra == "docs"
 Dynamic: license-file
 
 # Precise MRD
