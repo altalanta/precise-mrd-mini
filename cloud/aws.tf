@@ -362,3 +362,4 @@ output "api_endpoint" {
   description = "API endpoint URL"
   value       = "http://${aws_lb.mrd_lb.dns_name}"
 }
+

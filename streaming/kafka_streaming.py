@@ -454,3 +454,4 @@ if __name__ == "__main__":
         print("Streaming pipeline stopped")
     finally:
         pipeline.close()
+
