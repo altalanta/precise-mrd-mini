@@ -580,3 +580,4 @@ class AdaptiveThresholdOptimizer:
             'mean': mean_proportion
         }
 
+

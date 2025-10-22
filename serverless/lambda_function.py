@@ -168,3 +168,4 @@ if __name__ == "__main__":
     result = lambda_handler(test_event, MockContext())
     print("Lambda function test result:")
     print(json.dumps(json.loads(result['body']), indent=2))
+
