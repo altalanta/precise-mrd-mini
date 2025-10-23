@@ -363,3 +363,4 @@ output "api_endpoint" {
   value       = "http://${aws_lb.mrd_lb.dns_name}"
 }
 
+
