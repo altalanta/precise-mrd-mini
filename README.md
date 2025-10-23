@@ -45,10 +45,17 @@ A ctDNA/UMI toy MRD pipeline with **formal detection limit analytics**, determin
 - Statistical sanity tests (< 60s runtime)
 - Fail-closed behavior on regressions
 
+🚀 **Data Version Control (DVC) Integration** ⭐
+- Automatic experiment tracking and data versioning
+- Parameterized pipeline stages with dependency tracking
+- Remote storage support for large datasets
+- Systematic comparison of different configurations
+
 📚 **Documentation** ⭐
 - Complete MkDocs site with GitHub Pages deployment
 - Comprehensive evaluation methodology documentation
-- Interactive examples and tutorials
+- **Interactive tutorials** with hands-on examples for detection limits and contamination analysis
+- Step-by-step guides for clinical implementation
 
 ## Quick Start
 
@@ -57,6 +64,25 @@ uv sync --extra dev --extra docs   # Install locked dependencies
 precise-mrd smoke                  # Run fast deterministic pipeline
 precise-mrd determinism            # Verify hash-stable artifacts
 ```
+
+## DVC-Enhanced Workflows
+
+For advanced reproducibility and experiment tracking:
+
+```bash
+make dvc-setup                     # Initialize DVC (one-time)
+make smoke-dvc                    # Smoke test with DVC tracking
+make eval-dvc                     # All evaluations with DVC
+make dvc-experiment name=test     # Run parameter experiments
+dvc exp show                      # Compare experiments
+```
+
+## Tutorials ⭐
+
+New to Precise MRD? Start with our interactive tutorials:
+
+- **[Formal Detection Limits](https://altalanta.github.io/precise-mrd-mini/tutorials/formal-detection-limits/)**: Learn LoB, LoD, and LoQ calculations with hands-on examples
+- **[Contamination Analysis](https://altalanta.github.io/precise-mrd-mini/tutorials/contamination-analysis/)**: Understand contamination impact and mitigation strategies
 
 Prefer Makefiles? `make setup`, `make smoke`, and `make determinism` wrap the
 same CLI entry points for backwards compatibility.

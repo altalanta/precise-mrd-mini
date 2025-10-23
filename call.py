@@ -162,7 +162,7 @@ def call_mrd(
         df = results_df
 
     # Use deep learning-based variant calling if requested
-    if use_deep_learning:
+    elif use_deep_learning:
         print(f"  Using deep learning-based variant calling ({dl_model_type})...")
 
         # Initialize deep learning caller
@@ -203,97 +203,97 @@ def call_mrd(
 
         df = results_df
 
-    if output_path:
+    else:
+        # Default: Use statistical testing
+        print("  Using statistical variant calling...")
+
+        stats_config = config.stats
+
+        # Handle case where stats config might be a dict
+        if isinstance(stats_config, dict):
+            test_type = stats_config['test_type']
+            alpha = stats_config['alpha']
+            fdr_method = stats_config['fdr_method']
+        else:
+            test_type = stats_config.test_type
+            alpha = stats_config.alpha
+            fdr_method = stats_config.fdr_method
+
+        # Group by sample for statistical testing
+        call_data = []
+
+        for sample_id in collapsed_df['sample_id'].unique():
+            sample_data = collapsed_df[collapsed_df['sample_id'] == sample_id]
+
+            if len(sample_data) == 0:
+                continue
+
+            # Get sample metadata
+            allele_fraction = sample_data['allele_fraction'].iloc[0]
+
+            # Count variants and total families
+            n_variants = sample_data['is_variant'].sum()
+            n_total = len(sample_data)
+
+            if n_total == 0:
+                continue
+
+            # Get expected error rate (average across contexts)
+            mean_error_rate = error_model_df['error_rate'].mean()
+            expected_variants = n_total * mean_error_rate
+
+            # Perform statistical test
+            if test_type == "poisson":
+                p_value = poisson_test(n_variants, expected_variants)
+            elif test_type == "binomial":
+                p_value = binomial_test(n_variants, n_total, mean_error_rate)
+            else:
+                raise ValueError(f"Unknown test type: {test_type}")
+
+            # Calculate effect size
+            if expected_variants > 0:
+                fold_change = n_variants / expected_variants
+            else:
+                fold_change = float('inf') if n_variants > 0 else 1.0
+
+            # Quality metrics
+            mean_quality = sample_data['quality_score'].mean()
+            mean_consensus = sample_data['consensus_agreement'].mean()
+
+            call_data.append({
+                'sample_id': sample_id,
+                'allele_fraction': allele_fraction,
+                'n_variants': n_variants,
+                'n_total': n_total,
+                'variant_fraction': n_variants / n_total if n_total > 0 else 0,
+                'expected_variants': expected_variants,
+                'fold_change': fold_change,
+                'p_value': p_value,
+                'mean_quality': mean_quality,
+                'mean_consensus': mean_consensus,
+                'test_type': test_type,
+                'config_hash': config.config_hash(),
+            })
+
+        if not call_data:
+            df = pd.DataFrame()
+        else:
+            df = pd.DataFrame(call_data)
+
+            # Apply multiple testing correction
+            p_values = df['p_value'].values
+            rejected, adjusted_p = benjamini_hochberg_correction(
+                p_values,
+                alpha
+            )
+
+            df['p_adjusted'] = adjusted_p
+            df['significant'] = rejected
+            df['alpha'] = alpha
+            df['fdr_method'] = fdr_method
+
+    # Save results if output path specified
+    if output_path and not df.empty:
         df.to_parquet(output_path, index=False)
 
-    return df
-    
-    stats_config = config.stats
-    
-    # Handle case where stats config might be a dict
-    if isinstance(stats_config, dict):
-        test_type = stats_config['test_type']
-        alpha = stats_config['alpha']
-        fdr_method = stats_config['fdr_method']
-    else:
-        test_type = stats_config.test_type
-        alpha = stats_config.alpha
-        fdr_method = stats_config.fdr_method
-    
-    # Group by sample for statistical testing
-    call_data = []
-    
-    for sample_id in collapsed_df['sample_id'].unique():
-        sample_data = collapsed_df[collapsed_df['sample_id'] == sample_id]
-        
-        if len(sample_data) == 0:
-            continue
-        
-        # Get sample metadata
-        allele_fraction = sample_data['allele_fraction'].iloc[0]
-        
-        # Count variants and total families
-        n_variants = sample_data['is_variant'].sum()
-        n_total = len(sample_data)
-        
-        if n_total == 0:
-            continue
-        
-        # Get expected error rate (average across contexts)
-        mean_error_rate = error_model_df['error_rate'].mean()
-        expected_variants = n_total * mean_error_rate
-        
-        # Perform statistical test
-        if test_type == "poisson":
-            p_value = poisson_test(n_variants, expected_variants)
-        elif test_type == "binomial":
-            p_value = binomial_test(n_variants, n_total, mean_error_rate)
-        else:
-            raise ValueError(f"Unknown test type: {test_type}")
-        
-        # Calculate effect size
-        if expected_variants > 0:
-            fold_change = n_variants / expected_variants
-        else:
-            fold_change = float('inf') if n_variants > 0 else 1.0
-        
-        # Quality metrics
-        mean_quality = sample_data['quality_score'].mean()
-        mean_consensus = sample_data['consensus_agreement'].mean()
-        
-        call_data.append({
-            'sample_id': sample_id,
-            'allele_fraction': allele_fraction,
-            'n_variants': n_variants,
-            'n_total': n_total,
-            'variant_fraction': n_variants / n_total if n_total > 0 else 0,
-            'expected_variants': expected_variants,
-            'fold_change': fold_change,
-            'p_value': p_value,
-            'mean_quality': mean_quality,
-            'mean_consensus': mean_consensus,
-            'test_type': test_type,
-            'config_hash': config.config_hash(),
-        })
-    
-    if not call_data:
-        return pd.DataFrame()
-    
-    df = pd.DataFrame(call_data)
-    
-    # Apply multiple testing correction
-    p_values = df['p_value'].values
-    rejected, adjusted_p = benjamini_hochberg_correction(
-        p_values, 
-        alpha
-    )
-    
-    df['p_adjusted'] = adjusted_p
-    df['significant'] = rejected
-    df['alpha'] = alpha
-    df['fdr_method'] = fdr_method
-    
-    if output_path:
-        df.to_parquet(output_path, index=False)
-    
     return df

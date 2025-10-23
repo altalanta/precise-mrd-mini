@@ -29,7 +29,7 @@ class SimulationConfig:
         """Validate simulation configuration parameters."""
         if not self.allele_fractions:
             raise ValueError("allele_fractions cannot be empty")
-        if any(af <= 0 or af > 1 for af in self.allele_fractions):
+        if any(af < 0 or af > 1 for af in self.allele_fractions):
             raise ValueError("allele_fractions must be between 0 and 1")
         if not self.umi_depths:
             raise ValueError("umi_depths cannot be empty")
