@@ -1,0 +1,23 @@
+run_id: "integration_test_config"
+seed: 42
+
+simulation:
+  allele_fractions: [0.01, 0.001, 0.0001]
+  umi_depths: [2000, 8000]
+  n_replicates: 3
+  n_bootstrap: 30
+
+umi:
+  min_family_size: 3
+  max_family_size: 100
+  quality_threshold: 20
+  consensus_threshold: 0.6
+
+stats:
+  test_type: "poisson"
+  alpha: 0.05
+  fdr_method: "benjamini_hochberg"
+
+lod:
+  detection_threshold: 0.95
+  confidence_level: 0.95

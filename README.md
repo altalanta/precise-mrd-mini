@@ -51,6 +51,13 @@ A ctDNA/UMI toy MRD pipeline with **formal detection limit analytics**, determin
 - Remote storage support for large datasets
 - Systematic comparison of different configurations
 
+🧪 **Comprehensive Integration Testing** ⭐
+- End-to-end pipeline validation across diverse configurations
+- Contamination scenario testing with realistic noise models
+- Stratified analysis validation across genomic contexts
+- Deterministic behavior verification with hash-based validation
+- Performance regression testing and parameter sensitivity analysis
+
 📚 **Documentation** ⭐
 - Complete MkDocs site with GitHub Pages deployment
 - Comprehensive evaluation methodology documentation
@@ -75,6 +82,22 @@ make smoke-dvc                    # Smoke test with DVC tracking
 make eval-dvc                     # All evaluations with DVC
 make dvc-experiment name=test     # Run parameter experiments
 dvc exp show                      # Compare experiments
+```
+
+## Integration Testing
+
+Comprehensive end-to-end testing across various scenarios:
+
+```bash
+make test-integration-quick       # Fast integration tests (~2 min)
+make test-integration-full        # Complete test suite (~15 min)
+make test-contamination          # Contamination analysis tests
+make test-stratified             # Stratified analysis tests
+make test-determinism            # Deterministic behavior tests
+
+# Or use the test runner directly
+python tests/integration/run_integration_tests.py quick
+python tests/integration/run_integration_tests.py full
 ```
 
 ## Tutorials ⭐
@@ -252,8 +275,15 @@ precise-mrd determinism-check --seed 7
 ### Running Tests
 
 ```bash
-# All tests
+# Unit tests (fast)
 make test
+
+# Integration tests (comprehensive)
+make test-integration-quick       # Quick subset (~2 min)
+make test-integration-full        # Complete suite (~15 min)
+make test-contamination          # Contamination scenarios
+make test-stratified             # Stratified analysis
+make test-determinism            # Deterministic behavior
 
 # Test coverage
 make coverage
