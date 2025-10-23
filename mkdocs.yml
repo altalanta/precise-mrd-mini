@@ -9,7 +9,8 @@ nav:
   - Home: index.md
   - Getting Started: getting-started.md
   - Tutorials:
-    - Formal Detection Limits: tutorials/formal_detection_limits.ipynb
+    - Formal Detection Limits: tutorials/formal_detection_limits.md
+    - Contamination Analysis: tutorials/contamination_analysis.md
   - Evaluation: evaluation.md
   - Contamination Analysis: contamination.md
   - Statistical Validation: statistical-validation.md
@@ -55,7 +56,6 @@ plugins:
             docstring_style: google
             show_root_heading: true
             show_root_toc_entry: false
-  - mkdocs-jupyter
 
 markdown_extensions:
   - pymdownx.highlight:
