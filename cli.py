@@ -1024,18 +1024,16 @@ def ml_performance_cmd(reset: bool) -> None:
 
     # Model metrics
     if ml_report["model_metrics"]:
-        click.echo("
-Model Performance:")
+        click.echo("Model Performance:")
         for model_name, metrics in ml_report["model_metrics"].items():
             click.echo(f"  {model_name}:")
-            click.echo(f"    ROC AUC: {metrics.get(\"roc_auc\", \"N/A\")}")
-            click.echo(f"    Test ROC AUC: {metrics.get(\"test_roc_auc\", \"N/A\")}")
-            click.echo(f"    Features: {metrics.get(\"n_features\", \"N/A\")}")
+            click.echo(f"    ROC AUC: {metrics.get('roc_auc', 'N/A')}")
+            click.echo(f"    Test ROC AUC: {metrics.get('test_roc_auc', 'N/A')}")
+            click.echo(f"    Features: {metrics.get('n_features', 'N/A')}")
 
     # Feature importance
     if ml_report["feature_importance"]:
-        click.echo("
-Top Features (Ensemble):")
+        click.echo("Top Features (Ensemble):")
         ensemble_importance = ml_report["feature_importance"].get("ensemble_model", {})
         if ensemble_importance:
             sorted_features = sorted(ensemble_importance.items(), key=lambda x: x[1], reverse=True)
@@ -1044,23 +1042,19 @@ Top Features (Ensemble):")
 
     # Training times
     if ml_report["training_times"]:
-        click.echo("
-Training Times:")
+        click.echo("Training Times:")
         for model_name, time_taken in ml_report["training_times"].items():
             click.echo(f"  {model_name}: {time_taken:.2f}s")
 
     # Model comparison
     if comparison.get("best_model"):
-        click.echo(f"
-🏆 Best Model: {comparison[\"best_model\"]} (AUC: {comparison[\"best_metric\"]:.3f})")
+        click.echo(f"🏆 Best Model: {comparison['best_model']} (AUC: {comparison['best_metric']:.3f})")
 
-        click.echo("
-Model Ranking:")
+        click.echo("Model Ranking:")
         for i, (model, auc) in enumerate(comparison["model_ranking"]):
             click.echo(f"  {i+1}. {model}: {auc:.3f}")
 
-    click.echo(f"
-📊 Models Tracked: {ml_report[\"n_models_tracked\"]}")
+    click.echo(f"📊 Models Tracked: {ml_report['n_models_tracked']}")
 
 from .dashboard import run_dashboard
 
@@ -1093,8 +1087,7 @@ def dashboard_cmd(host: str, port: int, debug: bool) -> None:
         stcli.main()
 
     except KeyboardInterrupt:
-        click.echo("
-🛑 Dashboard stopped.")
+        click.echo("🛑 Dashboard stopped.")
     except Exception as e:
         click.echo(f"❌ Failed to start dashboard: {e}")
         raise click.ClickException(f"Dashboard startup failed: {e}")

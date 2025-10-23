@@ -1,0 +1,104 @@
+stages:
+  smoke:
+    cmd: uv run precise-mrd smoke --seed ${base.seed} --out-dir ${base.out_dir}
+    params:
+    - base.seed
+    - base.out_dir
+    deps:
+    - configs/
+    - src/
+    - params.yaml
+    outs:
+    - data/smoke/
+    - reports/metrics.json
+    - reports/auto_report.html
+    - reports/run_context.json
+
+  determinism:
+    cmd: uv run precise-mrd determinism --seed ${base.seed} --out-dir data/determinism
+    params:
+    - base.seed
+    deps:
+    - configs/
+    - src/
+    - params.yaml
+    outs:
+    - data/determinism/
+    - reports/hash_manifest.txt
+
+  eval-lob:
+    cmd: uv run precise-mrd eval-lob --n-blank ${evaluation.n_blank}
+    params:
+    - evaluation.n_blank
+    deps:
+    - configs/
+    - src/
+    - params.yaml
+    outs:
+    - reports/lob.json
+
+  eval-lod:
+    cmd: uv run precise-mrd eval-lod --replicates ${evaluation.replicates}
+    params:
+    - evaluation.replicates
+    deps:
+    - configs/
+    - src/
+    - params.yaml
+    outs:
+    - reports/lod_table.csv
+    - reports/lod_curves.png
+
+  eval-loq:
+    cmd: uv run precise-mrd eval-loq --replicates ${evaluation.replicates} --target-cv ${evaluation.target_cv}
+    params:
+    - evaluation.replicates
+    - evaluation.target_cv
+    deps:
+    - configs/
+    - src/
+    - params.yaml
+    outs:
+    - reports/loq_table.csv
+
+  eval-contamination:
+    cmd: uv run precise-mrd eval-contamination
+    params:
+    - contamination
+    deps:
+    - configs/
+    - src/
+    - params.yaml
+    outs:
+    - reports/contam_sensitivity.json
+    - reports/contam_heatmap.png
+
+  eval-stratified:
+    cmd: uv run precise-mrd eval-stratified
+    deps:
+    - configs/
+    - src/
+    - params.yaml
+    outs:
+    - reports/power_by_stratum.json
+    - reports/calibration_by_bin.csv
+
+  validate-artifacts:
+    cmd: uv run python -c "import precise_mrd.validation; precise_mrd.validation.validate_artifacts()"
+    params:
+    - validation
+    deps:
+    - reports/
+    - schemas/
+    - src/
+    - params.yaml
+
+  docs:
+    cmd: uv run mkdocs build --strict
+    deps:
+    - docs/
+    - src/
+    - configs/
+    - params.yaml
+    outs:
+    - site/

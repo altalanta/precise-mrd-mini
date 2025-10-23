@@ -5,7 +5,8 @@ UV ?= uv
 REPORTS_DIR := reports
 
 .PHONY: setup fmt lint type test smoke determinism eval-lob eval-lod eval-loq \
-        eval-contamination eval-stratified validate-model performance docs clean build release
+        eval-contamination eval-stratified validate-model performance docs clean build release \
+        dvc-setup dvc-status dvc-diff dvc-push dvc-pull dvc-repro dvc-experiment
 
 setup:
 	$(PYTHON) -m pip install --upgrade pip $(UV)
@@ -62,3 +63,45 @@ release: build
 clean:
 	rm -rf build dist *.egg-info $(REPORTS_DIR) data __pycache__
 	find . -name "__pycache__" -type d -prune -exec rm -rf {} +
+
+# DVC Commands
+dvc-setup:
+	$(UV) run python dvc-workflows.py setup
+
+dvc-status:
+	dvc status
+
+dvc-diff:
+	dvc diff
+
+dvc-push:
+	dvc push
+
+dvc-pull:
+	dvc pull
+
+dvc-repro:
+	dvc repro
+
+dvc-experiment:
+	@echo "Usage: make dvc-experiment name=<experiment_name>"
+	$(UV) run python dvc-workflows.py experiment --name $(name)
+
+# Enhanced pipeline commands with DVC
+smoke-dvc: dvc-setup
+	$(UV) run python dvc-workflows.py smoke
+
+determinism-dvc: dvc-setup
+	$(UV) run python dvc-workflows.py determinism
+
+eval-dvc: dvc-setup
+	$(UV) run python dvc-workflows.py evaluation
+
+validate-dvc: dvc-setup
+	$(UV) run python dvc-workflows.py validation
+
+docs-dvc: dvc-setup
+	$(UV) run python dvc-workflows.py docs
+
+all-dvc: dvc-setup
+	$(UV) run python dvc-workflows.py all

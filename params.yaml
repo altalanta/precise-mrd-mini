@@ -1,0 +1,31 @@
+base:
+  seed: 7
+  out_dir: data/results
+
+simulation:
+  allele_fractions: [0.01, 0.001, 0.0001]
+  umi_depths: [1000, 5000]
+  n_replicates: 10
+  n_bootstrap: 100
+
+umi:
+  min_family_size: 3
+  consensus_threshold: 0.6
+
+stats:
+  test_type: poisson
+  alpha: 0.05
+  fdr_method: benjamini_hochberg
+
+evaluation:
+  n_blank: 50
+  replicates: 25
+  target_cv: 0.20
+
+contamination:
+  rates: [0.0001, 0.001, 0.01, 0.1]
+  hop_rate: 0.001
+
+validation:
+  schema_strict: true
+  artifact_contract: true
