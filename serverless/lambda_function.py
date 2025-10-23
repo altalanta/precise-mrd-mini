@@ -169,3 +169,4 @@ if __name__ == "__main__":
     print("Lambda function test result:")
     print(json.dumps(json.loads(result['body']), indent=2))
 
+
