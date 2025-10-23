@@ -24,6 +24,44 @@ type:
 test:
 	$(UV) run pytest -q
 
+test-integration:
+	$(UV) run pytest -m integration --tb=short
+
+test-contamination:
+	$(UV) run pytest -m contamination --tb=short
+
+test-stratified:
+	$(UV) run pytest -m stratified --tb=short
+
+test-determinism:
+	$(UV) run pytest -m determinism --tb=short
+
+test-all:
+	$(UV) run pytest --tb=short
+
+# Integration Tests
+test-integration-quick:
+	$(UV) run python tests/integration/run_integration_tests.py quick
+
+test-integration-contamination:
+	$(UV) run python tests/integration/run_integration_tests.py contamination
+
+test-integration-stratified:
+	$(UV) run python tests/integration/run_integration_tests.py stratified
+
+test-integration-deterministic:
+	$(UV) run python tests/integration/run_integration_tests.py deterministic
+
+test-integration-performance:
+	$(UV) run python tests/integration/run_integration_tests.py performance
+
+test-integration-full:
+	$(UV) run python tests/integration/run_integration_tests.py full
+
+# List available integration tests
+test-integration-list:
+	$(UV) run python tests/integration/run_integration_tests.py --list
+
 smoke:
 	$(UV) run precise-mrd smoke --out-dir data/smoke
 

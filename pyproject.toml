@@ -79,7 +79,13 @@ python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 addopts = "-v --tb=short -m 'not slow'"
-markers = ["slow: mark tests that require heavier simulations"]
+markers = [
+    "slow: mark tests that require heavier simulations",
+    "integration: mark tests that run the full pipeline end-to-end",
+    "contamination: mark tests that focus on contamination analysis",
+    "stratified: mark tests that focus on stratified analysis",
+    "determinism: mark tests that validate deterministic behavior"
+]
 
 [tool.black]
 line-length = 100
