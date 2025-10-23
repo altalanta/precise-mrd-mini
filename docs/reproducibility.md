@@ -386,3 +386,222 @@ precise-mrd-archive/
 ```
 
 This comprehensive approach ensures that Precise MRD analyses remain fully reproducible across time, platforms, and computational environments.
+
+## Data Version Control (DVC) Integration ⭐
+
+Precise MRD integrates with **DVC (Data Version Control)** to provide comprehensive experiment tracking, data versioning, and pipeline orchestration.
+
+### DVC Setup
+
+DVC is already initialized in this repository. To start using it:
+
+```bash
+# Initialize DVC (already done)
+dvc init --no-scm
+
+# Set up data versioning
+make dvc-setup
+
+# Or manually
+dvc add data
+dvc add configs
+dvc add reports
+```
+
+### DVC Pipeline Stages
+
+The pipeline is organized into DVC stages for systematic execution:
+
+```bash
+# Run complete pipeline
+dvc repro
+
+# Run specific stages
+dvc repro smoke          # Run smoke test
+dvc repro eval-lod       # Run LoD calculation
+dvc repro docs           # Build documentation
+
+# Check pipeline status
+dvc status
+dvc diff
+```
+
+### Enhanced Makefile Commands
+
+New DVC-enabled commands are available:
+
+```bash
+# DVC-enhanced pipeline execution
+make smoke-dvc           # Smoke test with DVC tracking
+make determinism-dvc     # Determinism check with DVC
+make eval-dvc           # All evaluations with DVC
+make docs-dvc           # Documentation with DVC
+
+# DVC management
+make dvc-status         # Show DVC status
+make dvc-push          # Push data to remote storage
+make dvc-pull          # Pull data from remote storage
+make dvc-experiment name=my_experiment  # Run experiment
+```
+
+### Experiment Tracking
+
+DVC enables systematic experiment tracking:
+
+```bash
+# Run experiments with different parameters
+make dvc-experiment name="high_depth_test"
+make dvc-experiment name="contamination_sensitivity"
+make dvc-experiment name="umi_optimization"
+
+# Compare experiments
+dvc exp show
+dvc exp diff main high_depth_test
+
+# List all experiments
+dvc exp list
+```
+
+### Data Versioning
+
+Key directories are automatically versioned:
+
+- **`data/`**: All input and output data
+- **`configs/`**: Configuration files and parameters
+- **`reports/`**: Generated reports and artifacts
+
+```bash
+# Track changes to data
+dvc add data
+
+# See what changed
+dvc diff
+
+# Push large data to remote storage
+dvc push
+
+# Pull data from remote storage
+dvc pull
+```
+
+### Pipeline Parameters
+
+Pipeline parameters are managed through `params.yaml`:
+
+```yaml
+base:
+  seed: 7
+  out_dir: data/results
+
+simulation:
+  allele_fractions: [0.01, 0.001, 0.0001]
+  umi_depths: [1000, 5000]
+  n_replicates: 10
+
+evaluation:
+  n_blank: 50
+  replicates: 25
+  target_cv: 0.20
+
+contamination:
+  rates: [0.0001, 0.001, 0.01, 0.1]
+```
+
+Modify parameters and re-run pipeline:
+
+```bash
+# Edit parameters
+vim params.yaml
+
+# Reproduce with new parameters
+dvc repro eval-lod
+
+# Check what changed
+dvc diff
+```
+
+### Remote Storage Integration
+
+For large datasets and collaboration, configure remote storage:
+
+```bash
+# Add remote storage (S3, GCS, Azure, etc.)
+dvc remote add myremote s3://my-bucket/precise-mrd-data
+
+# Configure remote
+dvc remote modify myremote access_key_id $AWS_ACCESS_KEY_ID
+dvc remote modify myremote secret_access_key $AWS_SECRET_ACCESS_KEY
+
+# Push data to remote
+dvc push
+
+# Pull from remote
+dvc pull
+```
+
+### DVC Workflows
+
+Use the provided workflow script for common operations:
+
+```bash
+# Setup DVC (one-time)
+python dvc-workflows.py setup
+
+# Run specific workflows
+python dvc-workflows.py smoke
+python dvc-workflows.py evaluation
+python dvc-workflows.py validation
+python dvc-workflows.py docs
+
+# Experiment tracking
+python dvc-workflows.py experiment --name "parameter_study"
+
+# Data management
+python dvc-workflows.py push    # Push to remote
+python dvc-workflows.py pull    # Pull from remote
+```
+
+### Integration Benefits
+
+DVC integration provides:
+
+1. **Automatic Dependency Tracking**: Pipeline stages know what depends on what
+2. **Parameter Management**: Centralized parameter configuration
+3. **Data Versioning**: Track changes to large datasets efficiently
+4. **Experiment Tracking**: Systematic comparison of different runs
+5. **Remote Storage**: Share large data across teams
+6. **Reproducible Workflows**: Execute exact same pipeline steps
+
+### Best Practices for DVC
+
+1. **Commit DVC Files**: Always commit `.dvc` files and `dvc.yaml` to Git
+2. **Use Remotes**: Configure remote storage for large datasets
+3. **Parameterize Everything**: Use `params.yaml` for all configurable values
+4. **Document Experiments**: Name experiments descriptively
+5. **Validate Pipeline**: Use `dvc repro` to ensure pipeline integrity
+
+### Troubleshooting DVC
+
+**Common Issues:**
+
+```bash
+# Pipeline not running
+dvc status                    # Check what's outdated
+dvc repro --force            # Force re-run
+
+# Missing data
+dvc pull                     # Pull from remote
+dvc import <remote> <path>   # Import specific data
+
+# Parameter issues
+dvc params diff              # See parameter changes
+dvc repro <stage>           # Re-run specific stage
+```
+
+**Performance Tips:**
+
+- Use `.dvcignore` to exclude unnecessary files
+- Configure remote storage for large datasets
+- Use `dvc exp run` for parameter sweeps instead of manual loops
+
+This DVC integration enhances Precise MRD's already excellent reproducibility with systematic data versioning and experiment tracking capabilities.
