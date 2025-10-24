@@ -1,0 +1,72 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Calibration Results",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "calibration_data",
+    "af_values",
+    "depth_values",
+    "n_bins",
+    "config_hash"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "enum": ["1.0.0"]
+    },
+    "calibration_data": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "depth",
+          "af",
+          "ece",
+          "max_ce",
+          "bin_accuracies",
+          "bin_confidences",
+          "bin_counts",
+          "n_samples"
+        ],
+        "properties": {
+          "depth": {"type": "integer", "minimum": 0},
+          "af": {"type": "number", "minimum": 0, "maximum": 1},
+          "ece": {"type": "number", "minimum": 0, "maximum": 1},
+          "max_ce": {"type": "number", "minimum": 0, "maximum": 1},
+          "bin_accuracies": {
+            "type": "array",
+            "items": {"type": "number", "minimum": 0, "maximum": 1}
+          },
+          "bin_confidences": {
+            "type": "array",
+            "items": {"type": "number", "minimum": 0, "maximum": 1}
+          },
+          "bin_counts": {
+            "type": "array",
+            "items": {"type": "integer", "minimum": 0}
+          },
+          "n_samples": {"type": "integer", "minimum": 0}
+        },
+        "additionalProperties": true
+      }
+    },
+    "af_values": {
+      "type": "array",
+      "items": {"type": "number", "minimum": 0, "maximum": 1}
+    },
+    "depth_values": {
+      "type": "array",
+      "items": {"type": "integer", "minimum": 0}
+    },
+    "n_bins": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "config_hash": {
+      "type": "string",
+      "minLength": 8
+    }
+  },
+  "additionalProperties": true
+}

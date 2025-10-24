@@ -415,7 +415,7 @@ class MRDDashboard:
 
         # Load default config for display
         try:
-            config = load_config("src/precise_mrd/assets/configs/smoke.yaml")
+            config = load_config("configs/smoke.yaml")
 
             # Configuration summary
             col1, col2 = st.columns(2)
@@ -739,5 +739,6 @@ def run_dashboard():
 
 if __name__ == "__main__":
     run_dashboard()
+
 
 
