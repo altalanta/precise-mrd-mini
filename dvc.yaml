@@ -102,3 +102,11 @@ stages:
     - params.yaml
     outs:
     - site/
+
+  notebooks:
+    cmd: uv run papermill docs/tutorials/formal_detection_limits.ipynb reports/formal_detection_limits.ipynb
+    deps:
+    - docs/tutorials/formal_detection_limits.ipynb
+    - data/
+    outs:
+    - reports/formal_detection_limits.ipynb
