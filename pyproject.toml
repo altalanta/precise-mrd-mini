@@ -80,7 +80,7 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = "-v --tb=short -m 'not slow'"
+addopts = "-v --tb=short -m 'not slow' --cov=src/precise_mrd --cov-report=term-missing --cov-fail-under=80"
 markers = [
     "slow: mark tests that require heavier simulations",
     "integration: mark tests that run the full pipeline end-to-end",

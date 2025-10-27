@@ -27,7 +27,7 @@ stages:
     - reports/hash_manifest.txt
 
   eval-lob:
-    cmd: uv run precise-mrd eval-lob --n-blank ${evaluation.n_blank}
+    cmd: uv run precise-mrd eval lob --n-blank ${evaluation.n_blank}
     params:
     - evaluation.n_blank
     deps:
@@ -38,7 +38,7 @@ stages:
     - reports/lob.json
 
   eval-lod:
-    cmd: uv run precise-mrd eval-lod --replicates ${evaluation.replicates}
+    cmd: uv run precise-mrd eval lod --replicates ${evaluation.replicates}
     params:
     - evaluation.replicates
     deps:
@@ -50,7 +50,7 @@ stages:
     - reports/lod_curves.png
 
   eval-loq:
-    cmd: uv run precise-mrd eval-loq --replicates ${evaluation.replicates} --target-cv ${evaluation.target_cv}
+    cmd: uv run precise-mrd eval loq --replicates ${evaluation.replicates} --target-cv ${evaluation.target_cv}
     params:
     - evaluation.replicates
     - evaluation.target_cv
@@ -62,7 +62,7 @@ stages:
     - reports/loq_table.csv
 
   eval-contamination:
-    cmd: uv run precise-mrd eval-contamination
+    cmd: uv run precise-mrd eval contamination
     params:
     - contamination
     deps:
@@ -74,7 +74,7 @@ stages:
     - reports/contam_heatmap.png
 
   eval-stratified:
-    cmd: uv run precise-mrd eval-stratified
+    cmd: uv run precise-mrd eval stratified
     deps:
     - configs/
     - src/

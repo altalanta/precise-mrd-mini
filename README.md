@@ -5,6 +5,8 @@
 [![Docs](https://img.shields.io/badge/docs-mkdocs-blue)](https://altalanta.github.io/precise-mrd-mini/)
 [![Python 3.11](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Tests](https://github.com/murphy-lab/precise-mrd-mini/actions/workflows/main.yml/badge.svg)](https://github.com/murphy-lab/precise-mrd-mini/actions/workflows/main.yml)
+[![Coverage Status](https://img.shields.io/codecov/c/github/murphy-lab/precise-mrd-mini.svg)](https://codecov.io/gh/murphy-lab/precise-mrd-mini)
 
 A ctDNA/UMI toy MRD pipeline with **formal detection limit analytics**, deterministic error modeling, statistical validation, and comprehensive CI/CD hardening.
 

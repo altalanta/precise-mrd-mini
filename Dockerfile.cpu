@@ -9,8 +9,7 @@ ENV UV_SYSTEM_PYTHON=1
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends build-essential git && rm -rf /var/lib/apt/lists/*
 RUN pip install --upgrade pip uv==${UV_VERSION}
-COPY pyproject.toml uv.lock README.md ./
-COPY src ./src
+COPY . .
 RUN uv sync --frozen
 
 FROM python:${PYTHON_VERSION}-slim AS runtime
@@ -19,13 +18,9 @@ ENV UV_SYSTEM_PYTHON=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/opt/venv/bin:$PATH"
 WORKDIR /app
-RUN apt-get update && apt-get install -y --no-install-recommends make && rm -rf /var/lib/apt/lists/*
 RUN useradd --create-home --system mrd
 COPY --from=builder /app/.venv /opt/venv
-COPY pyproject.toml uv.lock README.md ./
-COPY src ./src
-COPY configs ./configs
-COPY schemas ./schemas
+COPY . .
 USER mrd
 HEALTHCHECK --interval=1m --timeout=5s CMD precise-mrd --help >/dev/null 2>&1 || exit 1
 ENTRYPOINT ["precise-mrd"]
