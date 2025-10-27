@@ -1,0 +1,54 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Limit of Blank Results",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "lob_value",
+    "blank_mean",
+    "blank_std",
+    "blank_measurements",
+    "n_blank_runs",
+    "percentile",
+    "config_hash"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "enum": ["1.0.0"]
+    },
+    "lob_value": {
+      "type": "number",
+      "minimum": 0
+    },
+    "blank_mean": {
+      "type": "number",
+      "minimum": 0
+    },
+    "blank_std": {
+      "type": "number",
+      "minimum": 0
+    },
+    "blank_measurements": {
+      "type": "array",
+      "items": {
+        "type": "number",
+        "minimum": 0
+      }
+    },
+    "n_blank_runs": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "percentile": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "config_hash": {
+      "type": "string",
+      "minLength": 8
+    }
+  },
+  "additionalProperties": true
+}

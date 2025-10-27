@@ -1,0 +1,80 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Contamination Sensitivity Results",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "index_hopping",
+    "barcode_collisions",
+    "cross_sample_contamination"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "enum": ["1.0.0"]
+    },
+    "index_hopping": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "mean_sensitivity": {"type": "number", "minimum": 0, "maximum": 1},
+              "std_sensitivity": {"type": "number", "minimum": 0},
+              "sensitivity_scores": {
+                "type": "array",
+                "items": {"type": "number", "minimum": 0, "maximum": 1}
+              },
+              "n_replicates": {"type": "integer", "minimum": 1}
+            },
+            "required": ["mean_sensitivity", "std_sensitivity", "n_replicates"],
+            "additionalProperties": true
+          }
+        }
+      }
+    },
+    "barcode_collisions": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "mean_sensitivity": {"type": "number", "minimum": 0, "maximum": 1},
+              "std_sensitivity": {"type": "number", "minimum": 0},
+              "mean_fp_rate": {"type": "number", "minimum": 0},
+              "std_fp_rate": {"type": "number", "minimum": 0},
+              "n_replicates": {"type": "integer", "minimum": 1}
+            },
+            "required": ["mean_sensitivity", "mean_fp_rate", "n_replicates"],
+            "additionalProperties": true
+          }
+        }
+      }
+    },
+    "cross_sample_contamination": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "object",
+          "properties": {
+            "mean_detection": {"type": "number", "minimum": 0, "maximum": 1},
+            "std_detection": {"type": "number", "minimum": 0}
+          },
+          "additionalProperties": true
+        }
+      }
+    },
+    "sensitivity_matrix": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}
