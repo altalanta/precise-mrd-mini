@@ -55,7 +55,8 @@ dev = [
     "twine==5.1.1",
     "dvc[s3]==3.50.0",
     "papermill==2.5.0",
-    "ipykernel==6.29.5"
+    "ipykernel==6.29.5",
+    "pre-commit==3.7.1"
 ]
 docs = [
     "mkdocs-material>=9.0.0",
