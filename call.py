@@ -10,6 +10,14 @@ from typing import Optional, Tuple
 from .config import PipelineConfig
 from .ml_models import GradientBoostedVariantCaller, EnsembleVariantCaller
 from .deep_learning_models import CNNLSTMModel, HybridModel, DeepLearningVariantCaller
+from .data_schemas import (
+    CollapsedUmisSchema,
+    ErrorModelSchema,
+    StatisticalCallsSchema,
+    MLCallsSchema,
+    DLCallsSchema,
+)
+import pandera as pa
 
 
 def poisson_test(observed: int, expected: float) -> float:
@@ -84,6 +92,12 @@ def benjamini_hochberg_correction(p_values: np.ndarray, alpha: float) -> Tuple[n
     return rejected, final_adjusted
 
 
+@pa.check_input(pa.DataFrameSchema(CollapsedUmisSchema.to_schema().columns,-
+                                 filter_ignore_na=True,
+                                 strict=False), "collapsed_df")
+@pa.check_input(pa.DataFrameSchema(ErrorModelSchema.to_schema().columns,-
+                                 filter_ignore_na=True,
+                                 strict=False), "error_model_df")
 def call_mrd(
     collapsed_df: pd.DataFrame,
     error_model_df: pd.DataFrame,
@@ -159,7 +173,7 @@ def call_mrd(
             'config_hash': config.config_hash()
         })
 
-        df = results_df
+        df = MLCallsSchema.validate(results_df)
 
     # Use deep learning-based variant calling if requested
     elif use_deep_learning:
@@ -201,7 +215,7 @@ def call_mrd(
             'config_hash': config.config_hash()
         })
 
-        df = results_df
+        df = DLCallsSchema.validate(results_df)
 
     else:
         # Default: Use statistical testing
@@ -291,6 +305,7 @@ def call_mrd(
             df['significant'] = rejected
             df['alpha'] = alpha
             df['fdr_method'] = fdr_method
+            df = StatisticalCallsSchema.validate(df)
 
     # Save results if output path specified
     if output_path and not df.empty:

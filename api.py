@@ -53,6 +53,42 @@ class JobStatus(BaseModel):
     results: Optional[Dict[str, Any]]
 
 
+class RootResponse(BaseModel):
+    """Response model for the root endpoint."""
+    name: str
+    version: str
+    description: str
+    endpoints: Dict[str, str]
+
+class HealthResponse(BaseModel):
+    """Response model for the health check endpoint."""
+    status: str
+    timestamp: datetime
+    version: str
+
+class JobListResponse(BaseModel):
+    """Response model for listing jobs."""
+    jobs: List[JobStatus]
+
+class ValidationResponse(BaseModel):
+    """Response model for configuration validation."""
+    is_valid: bool
+    issues: List[str]
+    warnings: List[str]
+    suggestions: List[str]
+    estimated_runtime_minutes: float
+    config_hash: str
+
+class TemplateListResponse(BaseModel):
+    """Response model for listing configuration templates."""
+    templates: List[Dict[str, Any]]
+
+class ConfigFromTemplateResponse(BaseModel):
+    """Response model for creating a configuration from a template."""
+    config_yaml: str
+    config_summary: Dict[str, Any]
+
+
 class PipelineResults(BaseModel):
     """Pipeline execution results."""
     job_id: str
@@ -169,7 +205,7 @@ app.add_middleware(
 )
 
 
-@app.get("/")
+@app.get("/", response_model=RootResponse)
 async def root():
     """Root endpoint with API information."""
     return {
@@ -185,7 +221,7 @@ async def root():
     }
 
 
-@app.get("/health")
+@app.get("/health", response_model=HealthResponse)
 async def health_check():
     """Health check endpoint."""
     return {
@@ -240,7 +276,7 @@ async def get_job_status(job_id: str):
     return job_manager.get_job_status(job_id)
 
 
-@app.get("/results/{job_id}")
+@app.get("/results/{job_id}", response_model=PipelineResults)
 async def get_job_results(job_id: str):
     """Get the results of a completed pipeline job."""
     status = job_manager.get_job_status(job_id)
@@ -257,7 +293,7 @@ async def get_job_results(job_id: str):
     if status.results is None:
         raise HTTPException(status_code=404, detail="Results not available")
 
-    return JSONResponse(content=status.results)
+    return status.results
 
 
 @app.get("/download/{job_id}/{artifact_type}")
@@ -283,7 +319,7 @@ async def download_artifact(job_id: str, artifact_type: str):
     )
 
 
-@app.get("/jobs")
+@app.get("/jobs", response_model=JobListResponse)
 async def list_jobs(limit: int = Query(50, description="Maximum number of jobs to return")):
     """List recent jobs."""
     job_manager.cleanup_old_jobs()
@@ -453,7 +489,7 @@ async def run_pipeline_job(job_id: str, config_request: PipelineConfigRequest):
         raise
 
 
-@app.post("/validate-config")
+@app.post("/validate-config", response_model=ValidationResponse)
 async def validate_configuration(config_yaml: str = Form(...)):
     """Validate a pipeline configuration."""
     try:
@@ -482,7 +518,7 @@ async def validate_configuration(config_yaml: str = Form(...)):
         raise HTTPException(status_code=400, detail=f"Configuration validation failed: {str(e)}")
 
 
-@app.get("/config-templates")
+@app.get("/config-templates", response_model=TemplateListResponse)
 async def get_config_templates():
     """Get available configuration templates."""
     from .config import PredefinedTemplates
@@ -495,7 +531,7 @@ async def get_config_templates():
     return {"templates": templates}
 
 
-@app.post("/config-from-template")
+@app.post("/config-from-template", response_model=ConfigFromTemplateResponse)
 async def create_config_from_template(
     template_name: str = Form(...),
     run_id: str = Form(...),
