@@ -5,9 +5,11 @@ from __future__ import annotations
 import pandas as pd
 import numpy as np
 from typing import Optional, Union
+import pandera as pa
 
 from .config import PipelineConfig
 from .performance import parallel_timing_decorator
+from .data_schemas import CollapsedUmisSchema, SimulatedReadsSchema
 
 # Optional Dask import for parallel processing
 try:
@@ -18,6 +20,10 @@ except ImportError:
     DASK_AVAILABLE = False
 
 
+@pa.check_input(pa.DataFrameSchema(SimulatedReadsSchema.to_schema().columns,
+                                 filter_ignore_na=True,
+                                 strict=False))
+@pa.check_output(CollapsedUmisSchema)
 def collapse_umis(
     reads_df: Union[pd.DataFrame, dd.DataFrame],
     config: PipelineConfig,
