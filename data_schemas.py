@@ -64,3 +64,4 @@ class DLCallsSchema(pa.DataFrameModel):
     dl_probability: Series[float] = pa.Field(ge=0, le=1)
     dl_threshold: Series[float] = pa.Field(ge=0, le=1)
     calling_method: Series[str]
+
