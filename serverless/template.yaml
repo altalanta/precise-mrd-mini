@@ -67,9 +67,3 @@ Outputs:
     Description: "Implicit IAM Role created for the MRD Pipeline function"
     Value: !GetAtt MRDPipelineFunctionRole.Arn
 
-
-
-
-
-
-
