@@ -19,14 +19,11 @@ from pydantic import BaseModel, Field
 import pandas as pd
 
 from .config import PipelineConfig, load_config, dump_config, ConfigValidator
-from .simulate import simulate_reads
-from .collapse import collapse_umis
-from .call import call_mrd
-from .error_model import fit_error_model
-from .metrics import calculate_metrics
-from .reporting import render_report
-from .determinism_utils import set_global_seed
-from .utils import PipelineIO
+from .pipeline_service import PipelineService
+from .logging_config import setup_logging, get_logger
+from .exceptions import ConfigurationError, DataProcessingError
+
+log = get_logger(__name__)
 
 
 # Pydantic models for API requests/responses
@@ -51,6 +48,42 @@ class JobStatus(BaseModel):
     end_time: Optional[datetime]
     error_message: Optional[str]
     results: Optional[Dict[str, Any]]
+
+
+class RootResponse(BaseModel):
+    """Response model for the root endpoint."""
+    name: str
+    version: str
+    description: str
+    endpoints: Dict[str, str]
+
+class HealthResponse(BaseModel):
+    """Response model for the health check endpoint."""
+    status: str
+    timestamp: datetime
+    version: str
+
+class JobListResponse(BaseModel):
+    """Response model for listing jobs."""
+    jobs: List[JobStatus]
+
+class ValidationResponse(BaseModel):
+    """Response model for configuration validation."""
+    is_valid: bool
+    issues: List[str]
+    warnings: List[str]
+    suggestions: List[str]
+    estimated_runtime_minutes: float
+    config_hash: str
+
+class TemplateListResponse(BaseModel):
+    """Response model for listing configuration templates."""
+    templates: List[Dict[str, Any]]
+
+class ConfigFromTemplateResponse(BaseModel):
+    """Response model for creating a configuration from a template."""
+    config_yaml: str
+    config_summary: Dict[str, Any]
 
 
 class PipelineResults(BaseModel):
@@ -159,6 +192,13 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
+@app.on_event("startup")
+async def startup_event():
+    """Configure logging on application startup."""
+    setup_logging()
+    log.info("Application startup complete. Logging configured.")
+
+
 # CORS middleware for web integration
 app.add_middleware(
     CORSMiddleware,
@@ -169,7 +209,7 @@ app.add_middleware(
 )
 
 
-@app.get("/")
+@app.get("/", response_model=RootResponse)
 async def root():
     """Root endpoint with API information."""
     return {
@@ -185,7 +225,7 @@ async def root():
     }
 
 
-@app.get("/health")
+@app.get("/health", response_model=HealthResponse)
 async def health_check():
     """Health check endpoint."""
     return {
@@ -226,12 +266,14 @@ async def submit_pipeline_job(
         job_manager.update_job_status(job_id, 'running', 0.0)
 
         # Run pipeline in background
-        background_tasks.add_task(run_pipeline_job, job_id, config_request)
+        background_tasks.add_task(pipeline_background_task, job_id, config_request)
 
         return job_manager.get_job_status(job_id)
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to submit job: {str(e)}")
+    except ConfigurationError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid configuration provided: {e}")
 
 
 @app.get("/status/{job_id}", response_model=JobStatus)
@@ -240,7 +282,7 @@ async def get_job_status(job_id: str):
     return job_manager.get_job_status(job_id)
 
 
-@app.get("/results/{job_id}")
+@app.get("/results/{job_id}", response_model=PipelineResults)
 async def get_job_results(job_id: str):
     """Get the results of a completed pipeline job."""
     status = job_manager.get_job_status(job_id)
@@ -257,7 +299,7 @@ async def get_job_results(job_id: str):
     if status.results is None:
         raise HTTPException(status_code=404, detail="Results not available")
 
-    return JSONResponse(content=status.results)
+    return status.results
 
 
 @app.get("/download/{job_id}/{artifact_type}")
@@ -283,7 +325,7 @@ async def download_artifact(job_id: str, artifact_type: str):
     )
 
 
-@app.get("/jobs")
+@app.get("/jobs", response_model=JobListResponse)
 async def list_jobs(limit: int = Query(50, description="Maximum number of jobs to return")):
     """List recent jobs."""
     job_manager.cleanup_old_jobs()
@@ -306,154 +348,18 @@ async def list_jobs(limit: int = Query(50, description="Maximum number of jobs t
     return {"jobs": recent_jobs}
 
 
-async def run_pipeline_job(job_id: str, config_request: PipelineConfigRequest):
-    """Run the MRD pipeline for a job (background task)."""
+def pipeline_background_task(job_id: str, config_request: PipelineConfigRequest):
+    """Wrapper to run the pipeline service in the background."""
+    service = PipelineService()
     try:
-        # Update progress
-        job_manager.update_job_status(job_id, 'running', 10.0)
-
-        # Load or create configuration
-        if config_request.config_override:
-            # Use custom configuration
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
-                f.write(config_request.config_override)
-                config_path = f.name
-
-            config = load_config(config_path)
-            # Clean up temp file
-            Path(config_path).unlink()
-        else:
-            # Use default configuration
-            config = PipelineConfig(
-                run_id=config_request.run_id,
-                seed=config_request.seed,
-                simulation=None,  # Will be auto-generated for API
-                umi=None,  # Use defaults
-                stats=None,  # Use defaults
-                lod=None,  # Use defaults
-            )
-
-        job_manager.update_job_status(job_id, 'running', 20.0)
-
-        # Set up output directories
-        job_dir = job_manager.results_dir / job_id
-        job_dir.mkdir(exist_ok=True)
-
-        reports_dir = job_dir / "reports"
-        reports_dir.mkdir(exist_ok=True)
-
-        data_dir = job_dir / "data"
-        data_dir.mkdir(exist_ok=True)
-
-        # Run pipeline stages
-        rng = set_global_seed(config_request.seed, deterministic_ops=True)
-
-        job_manager.update_job_status(job_id, 'running', 30.0)
-
-        # Simulate reads (if no FASTQ data provided)
-        reads_path = data_dir / "simulated_reads.parquet"
-        reads_df = simulate_reads(config, rng, output_path=str(reads_path))
-
-        job_manager.update_job_status(job_id, 'running', 50.0)
-
-        # Collapse UMIs
-        collapsed_path = data_dir / "collapsed_umis.parquet"
-        collapsed_df = collapse_umis(
-            reads_df, config, rng,
-            output_path=str(collapsed_path),
-            use_parallel=config_request.use_parallel
-        )
-
-        job_manager.update_job_status(job_id, 'running', 70.0)
-
-        # Fit error model
-        error_model_path = data_dir / "error_model.parquet"
-        error_model_df = fit_error_model(
-            collapsed_df, config, rng,
-            output_path=str(error_model_path)
-        )
-
-        job_manager.update_job_status(job_id, 'running', 80.0)
-
-        # Call variants
-        calls_path = data_dir / "mrd_calls.parquet"
-        calls_df = call_mrd(
-            collapsed_df, error_model_df, config, rng,
-            output_path=str(calls_path),
-            use_ml_calling=config_request.use_ml_calling,
-            ml_model_type=config_request.ml_model_type,
-            use_deep_learning=config_request.use_deep_learning,
-            dl_model_type=config_request.dl_model_type
-        )
-
-        job_manager.update_job_status(job_id, 'running', 90.0)
-
-        # Calculate metrics
-        metrics = calculate_metrics(calls_df, rng)
-
-        # Generate run context
-        run_context = {
-            "schema_version": "2.0.0",
-            "job_id": job_id,
-            "run_id": config_request.run_id,
-            "seed": config_request.seed,
-            "timestamp": datetime.now().isoformat(),
-            "config_hash": config.config_hash(),
-            "api_version": "2.0.0",
-            "processing_options": {
-                "parallel": config_request.use_parallel,
-                "ml_calling": config_request.use_ml_calling,
-                "ml_model_type": config_request.ml_model_type,
-                "deep_learning": config_request.use_deep_learning,
-                "dl_model_type": config_request.dl_model_type
-            }
-        }
-
-        # Save results
-        metrics_path = reports_dir / "metrics.json"
-        context_path = reports_dir / "run_context.json"
-        report_path = reports_dir / "auto_report.html"
-
-        PipelineIO.save_json(metrics, str(metrics_path))
-        PipelineIO.save_json(run_context, str(context_path))
-
-        # Generate HTML report
-        render_report(calls_df, metrics, config.to_dict(), run_context, str(report_path))
-
-        # Create manifest
-        manifest_path = reports_dir / "hash_manifest.txt"
-        write_manifest([metrics_path, context_path, report_path], out_manifest=manifest_path)
-
-        job_manager.update_job_status(job_id, 'completed', 100.0)
-
-        # Store results
-        results = {
-            'job_id': job_id,
-            'run_id': config_request.run_id,
-            'config_hash': config.config_hash(),
-            'status': 'completed',
-            'metrics': metrics,
-            'run_context': run_context,
-            'artifacts': {
-                'reads': str(reads_path),
-                'collapsed': str(collapsed_path),
-                'error_model': str(error_model_path),
-                'calls': str(calls_path),
-                'metrics': str(metrics_path),
-                'run_context': str(context_path),
-                'report': str(report_path),
-                'manifest': str(manifest_path)
-            }
-        }
-
-        job_manager.set_job_results(job_id, results)
-
+        service.run(job_id=job_id, config_request=config_request, job_manager=job_manager)
+    except DataProcessingError as e:
+        log.error("Background task failed with a data processing error", error=str(e))
     except Exception as e:
-        job_manager.update_job_status(job_id, 'failed', error=str(e))
-        raise
+        log.error("An unexpected error occurred in background task", error=str(e))
 
 
-@app.post("/validate-config")
+@app.post("/validate-config", response_model=ValidationResponse)
 async def validate_configuration(config_yaml: str = Form(...)):
     """Validate a pipeline configuration."""
     try:
@@ -466,23 +372,18 @@ async def validate_configuration(config_yaml: str = Form(...)):
             config = load_config(config_path)
             validation_result = ConfigValidator.validate_config(config)
 
-            return {
-                'is_valid': validation_result['is_valid'],
-                'issues': validation_result['issues'],
-                'warnings': validation_result['warnings'],
-                'suggestions': validation_result['suggestions'],
-                'estimated_runtime_minutes': validation_result['estimated_runtime_minutes'],
-                'config_hash': validation_result['config_hash']
-            }
+            return validation_result
 
         finally:
             Path(config_path).unlink()
 
+    except ConfigurationError as e:
+        raise HTTPException(status_code=400, detail=f"Configuration validation failed: {e}")
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Configuration validation failed: {str(e)}")
 
 
-@app.get("/config-templates")
+@app.get("/config-templates", response_model=TemplateListResponse)
 async def get_config_templates():
     """Get available configuration templates."""
     from .config import PredefinedTemplates
@@ -495,7 +396,7 @@ async def get_config_templates():
     return {"templates": templates}
 
 
-@app.post("/config-from-template")
+@app.post("/config-from-template", response_model=ConfigFromTemplateResponse)
 async def create_config_from_template(
     template_name: str = Form(...),
     run_id: str = Form(...),
@@ -511,19 +412,21 @@ async def create_config_from_template(
         template = PredefinedTemplates.get_production_template()
     else:
         raise HTTPException(status_code=400, detail=f"Unknown template: {template_name}")
+    try:
+        config = PipelineConfig.from_template(template, run_id)
+        config.seed = seed
 
-    config = PipelineConfig.from_template(template, run_id)
-    config.seed = seed
-
-    return {
-        'config_yaml': dump_config(config, None),  # Returns YAML string
-        'config_summary': {
-            'run_id': config.run_id,
-            'seed': config.seed,
-            'config_version': config.config_version,
-            'template': template_name
+        return {
+            'config_yaml': dump_config(config, None),  # Returns YAML string
+            'config_summary': {
+                'run_id': config.run_id,
+                'seed': config.seed,
+                'config_version': config.config_version,
+                'template': template_name
+            }
         }
-    }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to create config from template: {e}")
 
 
 def create_api_app() -> FastAPI:

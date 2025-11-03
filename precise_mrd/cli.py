@@ -31,6 +31,7 @@ from .statistical_validation import CrossValidator, StatisticalTester, Robustnes
 from .cache import PipelineCache
 from .config import ConfigValidator, PredefinedTemplates, PipelineConfig, ConfigVersionManager, dump_config
 from .api import create_api_app, run_api_server
+from .logging_config import setup_logging, get_logger
 
 DEFAULT_CONFIG_NAME = "smoke.yaml"
 REPORTS_DIR = Path("reports")
@@ -235,6 +236,7 @@ def _ensure_reports_dir() -> Path:
 @click.pass_context
 def main(ctx: click.Context, seed: int, config_path: Optional[Path], ml_model_type: str, dl_model_type: str) -> None:
     """Precise MRD: deterministic MRD analytics with hardened artifact contracts."""
+    setup_logging()
     ctx.obj = CLIContext(seed=seed, config_override=config_path, ml_model_type=ml_model_type, dl_model_type=dl_model_type)
 
 
@@ -290,6 +292,9 @@ def main(ctx: click.Context, seed: int, config_path: Optional[Path], ml_model_ty
 @click.pass_obj
 def smoke_cmd(ctx: CLIContext, out_dir: Path, parallel: bool, n_partitions: int, cache_dir: Path, use_cache: bool, ml_calling: bool, deep_learning: bool, dl_model_type: str) -> None:
     """Run the fast deterministic smoke pipeline."""
+    log = get_logger(__name__)
+    log.info("Starting smoke pipeline run...")
+
     config = _load_pipeline_config(ctx.config_override, ctx.seed)
     artifacts = _run_smoke_pipeline(config, ctx.seed, out_dir, use_parallel=parallel, n_partitions=n_partitions, use_cache=use_cache, cache_dir=cache_dir, use_ml_calling=ml_calling, ml_model_type=ctx.ml_model_type, use_deep_learning=deep_learning, dl_model_type=ctx.dl_model_type)
     validate_artifacts(REPORTS_DIR)
@@ -305,6 +310,7 @@ def smoke_cmd(ctx: CLIContext, out_dir: Path, parallel: bool, n_partitions: int,
             indent=2,
         )
     )
+    log.info("Smoke pipeline run completed successfully.")
 
 
 @main.command("determinism")
@@ -318,16 +324,21 @@ def smoke_cmd(ctx: CLIContext, out_dir: Path, parallel: bool, n_partitions: int,
 @click.pass_obj
 def determinism_cmd(ctx: CLIContext, out_dir: Path) -> None:
     """Run the smoke pipeline twice and assert identical artifacts."""
+    log = get_logger(__name__)
+    log.info("Starting determinism check...")
+
     config = _load_pipeline_config(ctx.config_override, ctx.seed)
     _ensure_reports_dir()
 
     cache_dir = out_dir / "cache"
+    log.info("Executing first pipeline run...")
     first_artifacts = _run_smoke_pipeline(config, ctx.seed, out_dir / "run1", use_parallel=True, n_partitions=2, use_cache=True, cache_dir=cache_dir, use_ml_calling=True, ml_model_type=ctx.ml_model_type, use_deep_learning=True, dl_model_type=ctx.dl_model_type)
     validate_artifacts(REPORTS_DIR)
     manifest_path = Path(first_artifacts["manifest"])
     snapshot_manifest = manifest_path.with_name("hash_manifest_run1.txt")
     shutil.copy2(manifest_path, snapshot_manifest)
 
+    log.info("Executing second pipeline run...")
     second_artifacts = _run_smoke_pipeline(config, ctx.seed, out_dir / "run2", use_parallel=True, n_partitions=2, use_cache=True, cache_dir=cache_dir, use_ml_calling=True, ml_model_type=ctx.ml_model_type, use_deep_learning=True, dl_model_type=ctx.dl_model_type)
     validate_artifacts(REPORTS_DIR)
 
@@ -347,6 +358,7 @@ def determinism_cmd(ctx: CLIContext, out_dir: Path) -> None:
             indent=2,
         )
     )
+    log.info("Determinism check completed successfully: hashes are identical.")
 
 
 def _run_lod_analysis(ctx: CLIContext) -> Tuple[LODAnalyzer, Dict[str, Path]]:

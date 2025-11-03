@@ -21,6 +21,12 @@ from .config import PipelineConfig, load_config, dump_config, ConfigValidator, P
 from .api import job_manager
 
 
+@st.cache_data
+def get_config(config_path: str) -> PipelineConfig:
+    """Load and cache the pipeline configuration."""
+    return load_config(config_path)
+
+
 class MRDDashboard:
     """Interactive web dashboard for MRD pipeline monitoring and control."""
 
@@ -37,12 +43,14 @@ class MRDDashboard:
             initial_sidebar_state="expanded"
         )
 
-        # Initialize session state
-        if 'jobs' not in st.session_state:
+        # Initialize session state more robustly
+        if "current_view" not in st.session_state:
+            st.session_state.current_view = "overview"
+        if "jobs" not in st.session_state:
             st.session_state.jobs = {}
-        if 'current_job' not in st.session_state:
-            st.session_state.current_job = None
-        if 'auto_refresh' not in st.session_state:
+        if "current_job_id" not in st.session_state:
+            st.session_state.current_job_id = None
+        if "auto_refresh" not in st.session_state:
             st.session_state.auto_refresh = True
 
     def render_header(self):
@@ -109,21 +117,16 @@ class MRDDashboard:
 
     def render_main_content(self):
         """Render the main content area."""
-        # Determine current view
-        current_view = getattr(st.session_state, 'current_view', 'overview')
-
-        if current_view == "new_job":
-            self.render_job_submission()
-        elif current_view == "jobs":
-            self.render_job_monitoring()
-        elif current_view == "metrics":
-            self.render_performance_metrics()
-        elif current_view == "config":
-            self.render_configuration_manager()
-        elif current_view == "docs":
-            self.render_documentation()
-        else:
-            self.render_overview()
+        view_mapping = {
+            "overview": self.render_overview,
+            "new_job": self.render_job_submission,
+            "jobs": self.render_job_monitoring,
+            "metrics": self.render_performance_metrics,
+            "config": self.render_configuration_manager,
+            "docs": self.render_documentation,
+        }
+        render_func = view_mapping.get(st.session_state.current_view, self.render_overview)
+        render_func()
 
     def render_overview(self):
         """Render the overview/dashboard home page."""
@@ -175,55 +178,49 @@ class MRDDashboard:
 
         # Job configuration form
         with st.form("job_submission_form"):
+            st.subheader("1. Job Details")
+            run_id = st.text_input(
+                "Run ID",
+                value=f"run_{int(time.time())}",
+                help="Unique identifier for this pipeline run"
+            )
+
+            st.subheader("2. Configuration")
+            config_source = st.radio(
+                "Configuration Source",
+                ["Upload YAML", "Use Defaults"],
+                horizontal=True,
+                help="Choose whether to upload a config file or use the default simulation settings."
+            )
+
+            uploaded_config = None
+            if config_source == "Upload YAML":
+                uploaded_file = st.file_uploader(
+                    "Upload Configuration YAML",
+                    type=["yaml", "yml"],
+                    help="Upload a custom pipeline configuration file."
+                )
+                if uploaded_file is not None:
+                    uploaded_config = uploaded_file.read().decode("utf-8")
+                    st.success("✅ Configuration file uploaded successfully!")
+
+            st.subheader("3. Processing Options")
             col1, col2 = st.columns(2)
-
             with col1:
-                run_id = st.text_input(
-                    "Run ID",
-                    value=f"run_{int(time.time())}",
-                    help="Unique identifier for this pipeline run"
-                )
-
-                seed = st.number_input(
-                    "Random Seed",
-                    min_value=0,
-                    value=7,
-                    help="Seed for reproducible results"
-                )
-
+                use_parallel = st.checkbox("Enable Parallel Processing", value=True)
+                use_ml = st.checkbox("Enable ML-based Calling", value=True)
             with col2:
-                use_parallel = st.checkbox(
-                    "Enable Parallel Processing",
-                    value=True,
-                    help="Use multiple CPU cores for faster processing"
-                )
+                use_dl = st.checkbox("Enable Deep Learning", value=False)
+                seed = st.number_input("Random Seed", min_value=0, value=7)
 
-                use_ml = st.checkbox(
-                    "Enable ML-based Calling",
-                    value=True,
-                    help="Use machine learning for variant detection"
-                )
-
-                use_dl = st.checkbox(
-                    "Enable Deep Learning",
-                    value=False,
-                    help="Use deep neural networks for enhanced detection"
-                )
-
-            # Advanced options
-            with st.expander("⚙️ Advanced Options"):
+            with st.expander("⚙️ Advanced Model Options"):
                 ml_model_type = st.selectbox(
-                    "ML Model Type",
-                    options=["ensemble", "xgboost", "lightgbm", "gbm"],
-                    value="ensemble",
-                    help="Machine learning model architecture"
+                    "ML Model Type", ["ensemble", "xgboost", "lightgbm", "gbm"],
+                    index=0, help="Machine learning model architecture"
                 )
-
                 dl_model_type = st.selectbox(
-                    "Deep Learning Model Type",
-                    options=["cnn_lstm", "hybrid", "transformer"],
-                    value="cnn_lstm",
-                    help="Deep learning model architecture"
+                    "Deep Learning Model Type", ["cnn_lstm", "hybrid", "transformer"],
+                    index=0, help="Deep learning model architecture"
                 )
 
             # Submit button
@@ -234,10 +231,15 @@ class MRDDashboard:
             )
 
             if submitted:
+                if config_source == "Upload YAML" and uploaded_config is None:
+                    st.error("Please upload a configuration file or choose 'Use Defaults'.")
+                    return
+
                 # Create job request
                 config_request = {
                     "run_id": run_id,
                     "seed": seed,
+                    "config_override": uploaded_config,
                     "use_parallel": use_parallel,
                     "use_ml_calling": use_ml,
                     "use_deep_learning": use_dl,
@@ -250,9 +252,9 @@ class MRDDashboard:
 
                 st.success(f"✅ Job submitted successfully! Job ID: `{job_id}`")
                 st.session_state.current_view = "jobs"
+                st.session_state.current_job_id = job_id
 
                 # Auto-refresh to show the new job
-                time.sleep(1)
                 st.rerun()
 
     def render_job_monitoring(self):
@@ -301,46 +303,35 @@ class MRDDashboard:
             # Results (if completed)
             if job.get('status') == 'completed' and job.get('results'):
                 st.subheader("📈 Results")
-
                 results = job['results']
 
-                # Metrics display
-                if 'metrics' in results:
-                    metrics = results['metrics']
+                tab1, tab2, tab3, tab4 = st.tabs(["📊 Report", "📈 Metrics", "📁 Artifacts", "⚙️ Context"])
 
-                    metric_col1, metric_col2, metric_col3, metric_col4 = st.columns(4)
+                with tab1:
+                    report_path = results.get('artifacts', {}).get('report')
+                    if report_path and Path(report_path).exists():
+                        with open(report_path) as f:
+                            st.components.v1.html(f.read(), height=600, scrolling=True)
+                    else:
+                        st.warning("HTML report not found.")
 
-                    with metric_col1:
-                        st.metric("Samples Processed", metrics.get('n_samples', 0))
+                with tab2:
+                    if 'metrics' in results:
+                        st.json(results['metrics'])
+                    else:
+                        st.info("No metrics available.")
 
-                    with metric_col2:
-                        st.metric("Variants Detected", metrics.get('n_variants', 0))
+                with tab3:
+                    if 'artifacts' in results:
+                        st.json(results['artifacts'])
+                    else:
+                        st.info("No artifacts available.")
 
-                    with metric_col3:
-                        st.metric("Detection Rate", f"{metrics.get('variant_rate', 0):.3f}")
-
-                    with metric_col4:
-                        st.metric("Mean AF", f"{metrics.get('mean_allele_fraction', 0):.4f}")
-
-                # Artifacts
-                if 'artifacts' in results:
-                    st.subheader("📁 Artifacts")
-
-                    artifacts = results['artifacts']
-
-                    for artifact_name, artifact_path in artifacts.items():
-                        if Path(artifact_path).exists():
-                            if artifact_path.endswith('.html'):
-                                st.markdown(f"**{artifact_name.title()}**: [View Report](file://{artifact_path})")
-                            elif artifact_path.endswith('.json'):
-                                with open(artifact_path, 'r') as f:
-                                    data = json.load(f)
-                                    st.json(data)
-                            elif artifact_path.endswith('.csv'):
-                                df = pd.read_csv(artifact_path)
-                                st.dataframe(df, use_container_width=True)
-                            else:
-                                st.info(f"📄 {artifact_name.title()}: {artifact_path}")
+                with tab4:
+                    if 'run_context' in results:
+                        st.json(results['run_context'])
+                    else:
+                        st.info("No run context available.")
 
     def render_performance_metrics(self):
         """Render performance metrics and analytics."""
@@ -413,9 +404,11 @@ class MRDDashboard:
         """Render current configuration display."""
         st.subheader("Current Pipeline Configuration")
 
-        # Load default config for display
+        st.info("This section shows the default `smoke.yaml` config. Use the builder or templates to create and upload your own.")
+
         try:
-            config = load_config("configs/smoke.yaml")
+            # Use the cached function to load the config
+            config = get_config("configs/smoke.yaml")
 
             # Configuration summary
             col1, col2 = st.columns(2)
@@ -441,7 +434,7 @@ class MRDDashboard:
                 st.code(config_yaml, language='yaml')
 
         except Exception as e:
-            st.error(f"Failed to load configuration: {e}")
+            st.error(f"Failed to load default configuration: {e}")
 
     def render_config_builder(self):
         """Render interactive configuration builder."""
@@ -739,6 +732,3 @@ def run_dashboard():
 
 if __name__ == "__main__":
     run_dashboard()
-
-
-
