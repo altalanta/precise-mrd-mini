@@ -219,7 +219,7 @@ All JSON artifacts carry explicit schema versions and are validated via
 - Trinucleotide context-aware error modeling
 - Deterministic family size distributions
 
-### 2. UMI Collapse (`collapse_umis`) 
+### 2. UMI Collapse (`collapse_umis`)
 - Quality-weighted consensus calling
 - Configurable family size thresholds
 - Consensus agreement filtering
@@ -319,7 +319,7 @@ The CI includes **fail-closed** jobs:
 The pipeline includes lightweight statistical tests:
 
 - **Type I Error Control**: Validates α-level control in hypothesis testing
-- **FDR Monotonicity**: Ensures BH correction is properly implemented  
+- **FDR Monotonicity**: Ensures BH correction is properly implemented
 - **Bootstrap Coverage**: Verifies CI coverage on synthetic data
 
 All tests run in <60s for CI efficiency.
@@ -333,7 +333,7 @@ Use `make clean-safe` instead to clean only generated artifacts.
 ## Performance
 
 - **Smoke test**: <5 minutes on standard CI
-- **Statistical tests**: <60 seconds  
+- **Statistical tests**: <60 seconds
 - **Memory usage**: ~200MB peak for smoke test
 
 ## Limitations
