@@ -10,17 +10,25 @@ from typing import Optional, Tuple
 from .config import PipelineConfig
 from .ml_models import GradientBoostedVariantCaller, EnsembleVariantCaller
 from .deep_learning_models import CNNLSTMModel, HybridModel, DeepLearningVariantCaller
+from .data_schemas import (
+    CollapsedUmisSchema,
+    ErrorModelSchema,
+    StatisticalCallsSchema,
+    MLCallsSchema,
+    DLCallsSchema,
+)
+import pandera as pa
 
 
 def poisson_test(observed: int, expected: float) -> float:
     """Two-tailed Poisson test."""
     if expected <= 0:
         return 1.0
-    
+
     # Calculate two-tailed p-value
     left_tail = stats.poisson.cdf(observed, expected)
     right_tail = stats.poisson.sf(observed - 1, expected)
-    
+
     # Two-tailed: double the smaller tail, but cap at 1.0
     p_value = 2 * min(left_tail, right_tail)
     return min(p_value, 1.0)
@@ -34,7 +42,7 @@ def binomial_test(successes: int, trials: int, p: float) -> float:
         # Special case: if p=0 and we observed successes, it's very significant
         return 0.0 if successes > 0 else 1.0
     if p >= 1:
-        # Special case: if p=1 and we observed failures, it's very significant  
+        # Special case: if p=1 and we observed failures, it's very significant
         return 0.0 if successes < trials else 1.0
     return stats.binomtest(successes, trials, p, alternative='two-sided').pvalue
 
@@ -84,6 +92,12 @@ def benjamini_hochberg_correction(p_values: np.ndarray, alpha: float) -> Tuple[n
     return rejected, final_adjusted
 
 
+@pa.check_input(pa.DataFrameSchema(CollapsedUmisSchema.to_schema().columns,-
+                                 filter_ignore_na=True,
+                                 strict=False), "collapsed_df")
+@pa.check_input(pa.DataFrameSchema(ErrorModelSchema.to_schema().columns,-
+                                 filter_ignore_na=True,
+                                 strict=False), "error_model_df")
 def call_mrd(
     collapsed_df: pd.DataFrame,
     error_model_df: pd.DataFrame,
@@ -159,7 +173,7 @@ def call_mrd(
             'config_hash': config.config_hash()
         })
 
-        df = results_df
+        df = MLCallsSchema.validate(results_df)
 
     # Use deep learning-based variant calling if requested
     elif use_deep_learning:
@@ -201,7 +215,7 @@ def call_mrd(
             'config_hash': config.config_hash()
         })
 
-        df = results_df
+        df = DLCallsSchema.validate(results_df)
 
     else:
         # Default: Use statistical testing
@@ -291,6 +305,7 @@ def call_mrd(
             df['significant'] = rejected
             df['alpha'] = alpha
             df['fdr_method'] = fdr_method
+            df = StatisticalCallsSchema.validate(df)
 
     # Save results if output path specified
     if output_path and not df.empty:

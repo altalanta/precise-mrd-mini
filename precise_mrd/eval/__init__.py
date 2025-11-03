@@ -5,7 +5,7 @@ from .stratified import StratifiedAnalyzer, run_stratified_analysis
 
 __all__ = [
     "LODAnalyzer",
-    "estimate_lob", 
+    "estimate_lob",
     "estimate_lod",
     "estimate_loq",
     "StratifiedAnalyzer",

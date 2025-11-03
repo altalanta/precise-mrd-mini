@@ -55,7 +55,7 @@
       "description": "Pandas version (if available)"
     },
     "scipy_version": {
-      "type": "string", 
+      "type": "string",
       "description": "SciPy version (if available)"
     },
     "torch_version": {

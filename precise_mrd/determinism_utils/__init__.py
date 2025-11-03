@@ -16,6 +16,6 @@ __all__ = [
     "set_global_seed",
     "env_fingerprint",
     "hash_file",
-    "hash_dir", 
+    "hash_dir",
     "write_manifest",
 ]
