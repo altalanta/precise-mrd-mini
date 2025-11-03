@@ -40,7 +40,7 @@ A ctDNA/UMI toy MRD pipeline with **formal detection limit analytics**, statisti
 
 ```bash
 make setup     # Install dependencies and package
-make smoke     # Run fast end-to-end pipeline  
+make smoke     # Run fast end-to-end pipeline
 make determinism  # Verify identical hashes across runs
 ```
 
@@ -64,7 +64,7 @@ Estimate AF yielding 95% detection across depth grid with bias-corrected confide
 precise-mrd eval-lod --af-range 1e-4,1e-2 --depths 1000,5000,10000 --seed 7
 ```
 
-**Outputs**: 
+**Outputs**:
 - `reports/lod_table.csv` - LoD values per depth with CIs
 - `reports/lod_curves.png` - Detection curves visualization
 

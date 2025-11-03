@@ -7,7 +7,7 @@ This page provides detailed information about the formal detection limit analyti
 Detection limits are fundamental analytical performance characteristics that define:
 
 - **Limit of Blank (LoB)**: The highest measurement result likely to be observed for a blank specimen
-- **Limit of Detection (LoD)**: The lowest analyte concentration likely to be reliably detected  
+- **Limit of Detection (LoD)**: The lowest analyte concentration likely to be reliably detected
 - **Limit of Quantification (LoQ)**: The lowest concentration at which quantitative measurements can be made with acceptable precision
 
 ## Mathematical Definitions
@@ -119,11 +119,11 @@ def bootstrap_lod_ci(af_values, hit_rates, target_rate=0.95, n_bootstrap=200):
         indices = rng.choice(len(af_values), size=len(af_values), replace=True)
         boot_af = [af_values[i] for i in indices]
         boot_hit = [hit_rates[i] for i in indices]
-        
+
         # Fit curve and solve for LoD
         boot_lod = fit_detection_curve(boot_af, boot_hit, target_rate)
         bootstrap_lods.append(boot_lod)
-    
+
     # 95% confidence interval
     ci_lower = np.percentile(bootstrap_lods, 2.5)
     ci_upper = np.percentile(bootstrap_lods, 97.5)
@@ -143,7 +143,7 @@ Bootstrap resampling provides bias-corrected estimates by accounting for samplin
 
 ### Consistency Checks
 
-**LoB < LoD Relationship**: 
+**LoB < LoD Relationship**:
 Detection limit must exceed blank variability:
 ```python
 assert lob_value < lod_value, "LoB must be less than LoD"

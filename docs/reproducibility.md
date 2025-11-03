@@ -45,10 +45,10 @@ def run_replicates(base_seed: int, n_replicates: int):
         # Derive unique seed for each replicate
         rep_seed = base_seed + rep * 1000
         rep_rng = np.random.default_rng(rep_seed)
-        
+
         result = run_single_replicate(rep_rng)
         results.append(result)
-    
+
     return results
 ```
 
@@ -172,7 +172,7 @@ For versioned releases, use the complete reproduction workflow:
 git clone --branch v1.0.0 https://github.com/altalanta/precise-mrd-mini.git
 cd precise-mrd-mini
 
-# 2. Install exact dependencies  
+# 2. Install exact dependencies
 make setup
 
 # 3. Reproduce release artifacts
@@ -250,14 +250,14 @@ def debug_determinism(func, *args, **kwargs):
     # Run function twice
     result1 = func(*args, **kwargs)
     result2 = func(*args, **kwargs)
-    
+
     # Compare results
     if isinstance(result1, dict):
         for key in result1:
             if not np.allclose(result1[key], result2[key], rtol=1e-10):
                 print(f"Non-determinism detected in key: {key}")
                 return False
-    
+
     return True
 ```
 
@@ -342,14 +342,14 @@ Hash comparison:
 def test_reproducibility():
     """Test that analysis is fully reproducible."""
     config = load_config("configs/test.yaml")
-    
+
     # Run analysis twice with same seed
     rng1 = np.random.default_rng(42)
     result1 = run_analysis(config, rng1)
-    
+
     rng2 = np.random.default_rng(42)  # Same seed
     result2 = run_analysis(config, rng2)
-    
+
     # Results should be identical
     assert np.allclose(result1, result2, rtol=1e-12)
 ```
