@@ -196,33 +196,33 @@ from precise_mrd.metrics import calculate_metrics
 # Run complete pipeline
 def run_complete_pipeline(config, rng):
     """Run the complete Precise MRD pipeline."""
-    
+
     # 1. Simulate synthetic reads
     print("Simulating reads...")
     reads_df = simulate_reads(config, rng)
     print(f"Generated {len(reads_df)} read families")
-    
+
     # 2. Collapse UMI families
     print("Collapsing UMI families...")
     collapsed_df = collapse_umis(reads_df, config, rng)
     print(f"Collapsed to {len(collapsed_df)} consensus reads")
-    
+
     # 3. Fit error model
     print("Fitting error model...")
     error_model = fit_error_model(collapsed_df, config, rng)
     print(f"Error model fitted with {len(error_model)} parameters")
-    
+
     # 4. Call variants
     print("Calling variants...")
     calls_df = call_mrd(collapsed_df, error_model, config, rng)
     n_variants = len(calls_df[calls_df['variant_call'] == True])
     print(f"Called {n_variants} variants from {len(calls_df)} tests")
-    
+
     # 5. Calculate performance metrics
     print("Calculating metrics...")
     metrics = calculate_metrics(calls_df, config, rng)
     print(f"Calculated {len(metrics)} performance metrics")
-    
+
     return {
         'reads': reads_df,
         'collapsed': collapsed_df,
@@ -368,14 +368,14 @@ def run_parallel_analysis(configs_and_seeds):
     """Run multiple analyses in parallel."""
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
         futures = []
-        
+
         for config, seed in configs_and_seeds:
             rng = np.random.default_rng(seed)  # Independent RNG per thread
             future = executor.submit(estimate_lod, config, rng)
             futures.append(future)
-        
+
         results = [future.result() for future in futures]
-    
+
     return results
 ```
 
@@ -393,7 +393,7 @@ def run_parallel_analysis(configs_and_seeds):
 On a standard CPU (Intel i5):
 
 - **Quick LoB** (20 runs): ~5 seconds
-- **Quick LoD** (reduced grid): ~15 seconds  
+- **Quick LoD** (reduced grid): ~15 seconds
 - **Full LoD** (complete grid): ~2 minutes
 - **Contamination stress test**: ~3 minutes
 - **Stratified analysis**: ~90 seconds

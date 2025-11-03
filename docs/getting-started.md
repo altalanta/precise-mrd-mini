@@ -53,7 +53,7 @@ After running `precise-mrd smoke`, check the `reports/` directory:
 ls reports/
 # Expected files:
 # metrics.json          - Performance metrics with bootstrap CIs
-# auto_report.html      - Interactive HTML report  
+# auto_report.html      - Interactive HTML report
 # run_context.json      - Complete reproducibility metadata
 # hash_manifest.txt     - SHA256 verification manifest
 ```
@@ -188,7 +188,7 @@ rng = np.random.default_rng(config.seed)
 
 # Run detection limit analysis
 lob_results = estimate_lob(config, rng, n_blank_runs=100)
-lod_results = estimate_lod(config, rng, af_range=(1e-4, 1e-2))  
+lod_results = estimate_lod(config, rng, af_range=(1e-4, 1e-2))
 loq_results = estimate_loq(config, rng, cv_threshold=0.20)
 
 # Run contamination testing

@@ -27,18 +27,18 @@ Index hopping occurs when free adapters in pooled libraries lead to misassignmen
 def simulate_with_index_hopping(reads_df, rng, hop_rate):
     n_reads = len(reads_df)
     n_hopped = rng.binomial(n_reads, hop_rate)
-    
+
     if n_hopped > 0:
         # Create contaminating reads from other samples
         contam_reads = reads_df.sample(n=n_hopped, random_state=rng).copy()
-        
+
         # Increase error rate for hopped reads
         contam_reads['background_rate'] *= 2.0
         contam_reads['n_false_positives'] *= 1.5
-        
+
         # Combine with original reads
         reads_df = pd.concat([reads_df, contam_reads], ignore_index=True)
-    
+
     return reads_df
 ```
 
@@ -57,17 +57,17 @@ UMI collisions occur when different DNA molecules are assigned the same barcode 
 def simulate_with_barcode_collisions(reads_df, rng, collision_rate):
     n_families = len(reads_df)
     n_collisions = rng.binomial(n_families, collision_rate)
-    
+
     if n_collisions > 0:
         collision_indices = rng.choice(n_families, size=n_collisions, replace=False)
-        
+
         # Increase false positive rate for collided families
         reads_df.loc[collision_indices, 'n_false_positives'] *= 2.0
         reads_df.loc[collision_indices, 'background_rate'] *= 1.5
-        
+
         # Reduce consensus quality
         reads_df.loc[collision_indices, 'mean_quality'] *= 0.8
-    
+
     return reads_df
 ```
 
@@ -87,14 +87,14 @@ def simulate_with_cross_contamination(reads_df, rng, contam_proportion):
     if contam_proportion > 0:
         n_reads = len(reads_df)
         n_contam = int(n_reads * contam_proportion)
-        
+
         # Create contaminating sample with higher AF
         contam_af = min(0.1, reads_df['allele_fraction'].iloc[0] * 10)
         contam_reads = simulate_contaminating_sample(contam_af, rng)
-        
+
         # Mix with original sample
         reads_df = pd.concat([reads_df, contam_reads[:n_contam]], ignore_index=True)
-    
+
     return reads_df
 ```
 
@@ -107,7 +107,7 @@ def simulate_with_cross_contamination(reads_df, rng, contam_proportion):
 ```python
 # Contamination stress test grid
 hop_rates = [0.0, 0.001, 0.002, 0.005, 0.01]           # 0-1% hopping
-barcode_collision_rates = [0.0, 0.0001, 0.0005, 0.001] # 0-0.1% collisions  
+barcode_collision_rates = [0.0, 0.0001, 0.0005, 0.001] # 0-0.1% collisions
 cross_sample_proportions = [0.0, 0.01, 0.05, 0.1]      # 0-10% mixing
 af_test_values = [0.001, 0.005, 0.01]                  # Representative AFs
 depth_values = [1000, 5000]                            # Representative depths
@@ -147,7 +147,7 @@ for hop_rate in hop_rates:
             contam_sensitivity = measure_contaminated_sensitivity(
                 af, depth, hop_rate, n_reps=20
             )
-            
+
             # Calculate impact
             sensitivity_delta = contam_sensitivity - clean_sensitivity
             results[hop_rate][af][depth] = {
@@ -177,9 +177,9 @@ from scipy import stats
 def test_contamination_impact(clean_scores, contam_scores, alpha=0.05):
     """Test if contamination significantly impacts detection."""
     statistic, p_value = stats.ttest_rel(clean_scores, contam_scores)
-    
+
     effect_size = (np.mean(contam_scores) - np.mean(clean_scores)) / np.std(clean_scores)
-    
+
     return {
         'p_value': p_value,
         'significant': p_value < alpha,
@@ -196,10 +196,10 @@ Dose-response relationships are modeled using logistic regression:
 # Model: sensitivity ~ log(contamination_rate) + AF + depth
 def fit_contamination_model(results_df):
     from sklearn.linear_model import LogisticRegression
-    
+
     X = results_df[['log_contam_rate', 'af', 'depth']]
     y = results_df['sensitivity'] > 0.9  # Binary: good sensitivity
-    
+
     model = LogisticRegression().fit(X, y)
     return model
 ```
@@ -230,7 +230,7 @@ Based on simulation studies:
 ### Cross-Contamination Threshold
 
 - **<1% mixing**: Minimal impact (<2% sensitivity change)
-- **1-5% mixing**: Moderate impact (2-10% sensitivity change)  
+- **1-5% mixing**: Moderate impact (2-10% sensitivity change)
 - **>5% mixing**: Significant impact (>10% sensitivity change)
 
 ## Validation Framework
@@ -246,10 +246,10 @@ def test_contamination_sanity():
     hop_rate = 0.001  # 0.1% hopping
     af = 0.005       # Moderate AF
     depth = 5000     # Standard depth
-    
+
     clean_sens = measure_clean_sensitivity(af, depth, n_reps=5)
     contam_sens = measure_contaminated_sensitivity(af, depth, hop_rate, n_reps=5)
-    
+
     # Should not lose >5% sensitivity at low contamination
     assert (clean_sens - contam_sens) < 0.05, "Excess sensitivity loss under minimal contamination"
 ```
@@ -264,7 +264,7 @@ def detect_contamination_regression(current_results, reference_results):
     for condition in current_results:
         current_sens = current_results[condition]['sensitivity']
         reference_sens = reference_results[condition]['sensitivity']
-        
+
         if (reference_sens - current_sens) > 0.03:  # >3% regression
             raise AssertionError(f"Contamination regression detected at {condition}")
 ```
@@ -319,7 +319,7 @@ Run contamination stress testing:
 # Quick stress test (reduced grid for speed)
 precise-mrd eval-contamination --quick --seed 7
 
-# Full stress test 
+# Full stress test
 precise-mrd eval-contamination \
     --hop-rates 0.0,0.001,0.002,0.005,0.01 \
     --collision-rates 0.0,0.0001,0.0005,0.001 \

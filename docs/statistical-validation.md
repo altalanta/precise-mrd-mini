@@ -23,10 +23,10 @@ def test_type_i_error_control():
     """Test that Type I error rate is controlled at α = 0.05."""
     alpha = 0.05
     n_null_tests = 1000
-    
+
     # Generate null data (no true variants)
     false_positive_rate = run_null_hypothesis_tests(n_null_tests)
-    
+
     # Should reject ≤ 5% of null hypotheses
     assert false_positive_rate <= alpha + tolerance
 ```
@@ -42,9 +42,9 @@ def test_fdr_monotonicity():
     """Test that BH-adjusted p-values are monotonic."""
     raw_p_values = [0.001, 0.01, 0.05, 0.1, 0.5]
     adjusted_p_values = benjamini_hochberg_correction(raw_p_values)
-    
+
     # Adjusted p-values should be monotonically increasing
-    assert all(adjusted_p_values[i] <= adjusted_p_values[i+1] 
+    assert all(adjusted_p_values[i] <= adjusted_p_values[i+1]
               for i in range(len(adjusted_p_values)-1))
 ```
 
@@ -60,18 +60,18 @@ def test_bootstrap_coverage():
     true_parameter = 0.05
     n_experiments = 200
     coverage_count = 0
-    
+
     for _ in range(n_experiments):
         # Generate data with known parameter
         data = generate_synthetic_data(true_parameter)
-        
+
         # Compute bootstrap CI
         ci_lower, ci_upper = bootstrap_confidence_interval(data, alpha=0.05)
-        
+
         # Check if CI contains true parameter
         if ci_lower <= true_parameter <= ci_upper:
             coverage_count += 1
-    
+
     coverage_rate = coverage_count / n_experiments
     # Should be approximately 0.95
     assert 0.90 <= coverage_rate <= 1.00
@@ -90,14 +90,14 @@ def test_detection_limit_consistency():
     lob_value = estimate_lob()
     lod_value = estimate_lod()
     loq_value = estimate_loq()
-    
+
     # Convert to comparable units and check relationships
     lob_equivalent_af = convert_calls_to_af(lob_value)
-    
+
     # LoB should be less than LoD
     assert lob_equivalent_af < lod_value
-    
-    # LoD should be less than or equal to LoQ  
+
+    # LoD should be less than or equal to LoQ
     assert lod_value <= loq_value
 ```
 
@@ -112,7 +112,7 @@ def test_depth_monotonicity():
     """Test that LoD improves with depth."""
     depths = [1000, 5000, 10000]
     lod_values = [estimate_lod(depth=d) for d in depths]
-    
+
     # LoD should decrease (improve) with depth
     for i in range(len(depths) - 1):
         assert lod_values[i] >= lod_values[i+1] * tolerance_factor
@@ -131,9 +131,9 @@ def test_contamination_regression():
     """Detect regressions in contamination tolerance."""
     baseline_sensitivity = measure_clean_sensitivity()
     contaminated_sensitivity = measure_contaminated_sensitivity(hop_rate=0.001)
-    
+
     sensitivity_loss = baseline_sensitivity - contaminated_sensitivity
-    
+
     # Should not lose >3% sensitivity at 0.1% hop rate
     assert sensitivity_loss < 0.03
 ```
@@ -149,7 +149,7 @@ def test_contamination_dose_response():
     """Test that contamination impact increases with contamination level."""
     hop_rates = [0.001, 0.005, 0.01]
     sensitivity_values = [measure_contaminated_sensitivity(rate) for rate in hop_rates]
-    
+
     # Sensitivity should decrease with increasing contamination
     for i in range(len(hop_rates) - 1):
         assert sensitivity_values[i] >= sensitivity_values[i+1]
@@ -168,7 +168,7 @@ def test_calibration_quality():
     """Test that model predictions are well-calibrated."""
     predicted_probs, true_labels = generate_calibration_data()
     ece = compute_expected_calibration_error(predicted_probs, true_labels)
-    
+
     # ECE should be < 0.1 (well-calibrated)
     assert ece < 0.10
 ```
@@ -185,7 +185,7 @@ def test_reliability_across_bins():
     for bin_range in [(0.0, 0.2), (0.2, 0.4), (0.4, 0.6), (0.6, 0.8), (0.8, 1.0)]:
         predicted_freq = get_mean_prediction_in_bin(bin_range)
         observed_freq = get_observed_frequency_in_bin(bin_range)
-        
+
         # Should be close (within 10%)
         relative_error = abs(predicted_freq - observed_freq) / max(predicted_freq, 0.01)
         assert relative_error < 0.10
@@ -260,7 +260,7 @@ Validation results are automatically generated and included in CI reports:
 
 ### Type I Error Rate Too High
 
-**Symptom**: False positive rate > 5.5%  
+**Symptom**: False positive rate > 5.5%
 **Possible Causes**:
 - Bug in statistical testing implementation
 - Incorrect p-value calculation
@@ -275,7 +275,7 @@ plot_p_value_histogram(null_p_values)  # Should be uniform
 
 ### Bootstrap Coverage Too Low
 
-**Symptom**: Coverage < 90%  
+**Symptom**: Coverage < 90%
 **Possible Causes**:
 - Bias in estimator
 - Insufficient bootstrap samples
@@ -289,7 +289,7 @@ estimate_bias = check_estimator_bias(true_param, estimated_params)
 
 ### Detection Limit Inconsistency
 
-**Symptom**: LoB ≥ LoD or LoD > LoQ  
+**Symptom**: LoB ≥ LoD or LoD > LoQ
 **Possible Causes**:
 - Units mismatch between LoB and LoD
 - Insufficient sample sizes
@@ -303,7 +303,7 @@ debug_detection_limit_estimation(verbose=True)
 
 ### Contamination Regression
 
-**Symptom**: Unexpected sensitivity loss  
+**Symptom**: Unexpected sensitivity loss
 **Possible Causes**:
 - Bug in contamination simulation
 - Changes in pipeline sensitivity
