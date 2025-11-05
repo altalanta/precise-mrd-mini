@@ -143,3 +143,7 @@ docs-dvc: dvc-setup
 
 all-dvc: dvc-setup
 	$(UV) run python dvc-workflows.py all
+
+.PHONY: profile
+profile:
+	$(UV) run python profile_pipeline.py
