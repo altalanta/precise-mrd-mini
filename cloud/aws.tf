@@ -122,169 +122,6 @@ resource "aws_security_group" "mrd_sg" {
   }
 }
 
-# ECS Cluster
-resource "aws_ecs_cluster" "mrd_cluster" {
-  name = "precise-mrd-cluster"
-
-  setting {
-    name  = "containerInsights"
-    value = "enabled"
-  }
-
-  tags = {
-    Environment = var.environment
-  }
-}
-
-# ECS Task Definition
-resource "aws_ecs_task_definition" "mrd_task" {
-  family                   = "precise-mrd-api"
-  network_mode             = "awsvpc"
-  requires_compatibilities = ["FARGATE"]
-  cpu                      = "1024"
-  memory                   = "2048"
-  execution_role_arn       = aws_iam_role.ecs_execution_role.arn
-  task_role_arn           = aws_iam_role.ecs_task_role.arn
-
-  container_definitions = jsonencode([
-    {
-      name  = "mrd-api"
-      image = "precise-mrd-api:latest"
-
-      portMappings = [
-        {
-          containerPort = 8000
-          hostPort      = 8000
-          protocol      = "tcp"
-        }
-      ]
-
-      environment = [
-        {
-          name  = "PRECISE_MRD_LOG_LEVEL"
-          value = "INFO"
-        },
-        {
-          name  = "ENABLE_PARALLEL_PROCESSING"
-          value = "true"
-        },
-        {
-          name  = "ENABLE_ML_CALLING"
-          value = "true"
-        },
-        {
-          name  = "ENABLE_DEEP_LEARNING"
-          value = "true"
-        }
-      ]
-
-      logConfiguration = {
-        logDriver = "awslogs"
-        options = {
-          awslogs-group         = "/ecs/precise-mrd-api"
-          awslogs-region        = var.aws_region
-          awslogs-stream-prefix = "ecs"
-        }
-      }
-
-      healthCheck = {
-        command = [
-          "CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"
-        ]
-        interval    = 30
-        timeout     = 5
-        retries     = 3
-        startPeriod = 60
-      }
-    }
-  ])
-
-  tags = {
-    Environment = var.environment
-  }
-}
-
-# ECS Service
-resource "aws_ecs_service" "mrd_service" {
-  name            = "precise-mrd-api-service"
-  cluster         = aws_ecs_cluster.mrd_cluster.id
-  task_definition = aws_ecs_task_definition.mrd_task.arn
-  desired_count   = 3
-
-  capacity_provider_strategy {
-    capacity_provider = "FARGATE"
-    weight           = 100
-  }
-
-  network_configuration {
-    subnets          = [aws_subnet.mrd_subnet.id]
-    security_groups  = [aws_security_group.mrd_sg.id]
-    assign_public_ip = true
-  }
-
-  load_balancer {
-    target_group_arn = aws_lb_target_group.mrd_target_group.arn
-    container_name   = "mrd-api"
-    container_port   = 8000
-  }
-
-  depends_on = [aws_lb_listener.mrd_listener]
-
-  tags = {
-    Environment = var.environment
-  }
-}
-
-# Load Balancer
-resource "aws_lb" "mrd_lb" {
-  name               = "precise-mrd-lb"
-  internal           = false
-  load_balancer_type = "application"
-  security_groups    = [aws_security_group.mrd_sg.id]
-  subnets            = [aws_subnet.mrd_subnet.id]
-
-  enable_deletion_protection = false
-
-  tags = {
-    Environment = var.environment
-  }
-}
-
-resource "aws_lb_target_group" "mrd_target_group" {
-  name        = "precise-mrd-tg"
-  port        = 8000
-  protocol    = "HTTP"
-  vpc_id      = aws_vpc.mrd_vpc.id
-  target_type = "ip"
-
-  health_check {
-    enabled             = true
-    healthy_threshold   = 2
-    unhealthy_threshold = 2
-    timeout             = 5
-    interval            = 30
-    path                = "/health"
-    matcher             = "200"
-    port                = "traffic-port"
-    protocol            = "HTTP"
-  }
-
-  tags = {
-    Environment = var.environment
-  }
-}
-
-resource "aws_lb_listener" "mrd_listener" {
-  load_balancer_arn = aws_lb.mrd_lb.arn
-  port              = "80"
-  protocol          = "HTTP"
-
-  default_action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.mrd_target_group.arn
-  }
-}
-
 # IAM Roles
 resource "aws_iam_role" "ecs_execution_role" {
   name = "precise-mrd-ecs-execution-role"
@@ -342,6 +179,243 @@ resource "aws_iam_role" "ecs_task_role" {
   }
 }
 
+# ECR Repository
+resource "aws_ecr_repository" "mrd_ecr" {
+  name                 = "precise-mrd-pipeline"
+  image_tag_mutability = "MUTABLE"
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+
+  tags = {
+    Environment = var.environment
+  }
+}
+
+# IAM Roles for AWS Batch
+resource "aws_iam_role" "batch_service_role" {
+  name = "precise-mrd-batch-service-role"
+  assume_role_policy = jsonencode({
+    Version   = "2012-10-17",
+    Statement = [{
+      Action    = "sts:AssumeRole",
+      Effect    = "Allow",
+      Principal = { Service = "batch.amazonaws.com" }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "batch_service_role_attachment" {
+  role       = aws_iam_role.batch_service_role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSBatchServiceRole"
+}
+
+resource "aws_iam_role" "ecs_instance_role" {
+  name = "precise-mrd-ecs-instance-role"
+  assume_role_policy = jsonencode({
+    Version   = "2012-10-17",
+    Statement = [{
+      Action    = "sts:AssumeRole",
+      Effect    = "Allow",
+      Principal = { Service = "ec2.amazonaws.com" }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "ecs_instance_role_attachment" {
+  role       = aws_iam_role.ecs_instance_role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role"
+}
+
+resource "aws_iam_instance_profile" "ecs_instance_profile" {
+  name = "precise-mrd-ecs-instance-profile"
+  role = aws_iam_role.ecs_instance_role.name
+}
+
+resource "aws_iam_role" "batch_job_role" {
+  name = "precise-mrd-batch-job-role"
+  assume_role_policy = jsonencode({
+    Version   = "2012-10-17",
+    Statement = [{
+      Action    = "sts:AssumeRole",
+      Effect    = "Allow",
+      Principal = { Service = "ecs-tasks.amazonaws.com" }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "batch_job_policy" {
+  name = "precise-mrd-batch-job-policy"
+  role = aws_iam_role.batch_job_role.id
+  policy = jsonencode({
+    Version   = "2012-10-17",
+    Statement = [{
+      Effect   = "Allow",
+      Action   = [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:ListBucket"
+      ],
+      Resource = "*" # Restrict in production
+    }]
+  })
+}
+
+# AWS Batch Compute Environment
+resource "aws_batch_compute_environment" "mrd_batch_ce" {
+  compute_environment_name = "precise-mrd-compute-env"
+  type                     = "MANAGED"
+  service_role             = aws_iam_role.batch_service_role.arn
+
+  compute_resources {
+    type                      = "FARGATE"
+    max_vcpus                 = 16
+    subnets                   = [aws_subnet.mrd_subnet.id]
+    security_group_ids        = [aws_security_group.mrd_sg.id]
+  }
+
+  tags = {
+    Environment = var.environment
+  }
+}
+
+# AWS Batch Job Queue
+resource "aws_batch_job_queue" "mrd_job_queue" {
+  name     = "precise-mrd-job-queue"
+  state    = "ENABLED"
+  priority = 1
+
+  compute_environments = [
+    aws_batch_compute_environment.mrd_batch_ce.arn
+  ]
+
+  tags = {
+    Environment = var.environment
+  }
+}
+
+# AWS Batch Job Definition
+resource "aws_batch_job_definition" "mrd_job_def" {
+  name = "precise-mrd-job-definition"
+  type = "container"
+
+  platform_capabilities = ["FARGATE"]
+
+  container_properties = jsonencode({
+    image       = "${aws_ecr_repository.mrd_ecr.repository_url}:latest",
+    jobRoleArn  = aws_iam_role.batch_job_role.arn,
+    executionRoleArn = aws_iam_role.ecs_execution_role.arn,
+    resourceRequirements = [
+      { type = "VCPU", value = "2" },
+      { type = "MEMORY", value = "4096" }
+    ],
+    command = [
+      "Ref::command"
+    ],
+    environment = [
+      { name = "PRECISE_MRD_LOG_LEVEL", value = "INFO" }
+    ]
+  })
+
+  tags = {
+    Environment = var.environment
+  }
+}
+
+# API Gateway
+resource "aws_apigatewayv2_api" "mrd_api" {
+  name          = "precise-mrd-api"
+  protocol_type = "HTTP"
+  target        = aws_lambda_function.job_submitter.invoke_arn
+
+  tags = {
+    Environment = var.environment
+  }
+}
+
+resource "aws_apigatewayv2_integration" "lambda_integration" {
+  api_id           = aws_apigatewayv2_api.mrd_api.id
+  integration_type = "AWS_PROXY"
+  integration_uri  = aws_lambda_function.job_submitter.invoke_arn
+  payload_format_version = "2.0"
+}
+
+resource "aws_apigatewayv2_route" "submit_route" {
+  api_id    = aws_apigatewayv2_api.mrd_api.id
+  route_key = "POST /submit"
+  target    = "integrations/${aws_apigatewayv2_integration.lambda_integration.id}"
+}
+
+resource "aws_apigatewayv2_stage" "api_stage" {
+  api_id      = aws_apigatewayv2_api.mrd_api.id
+  name        = "$default"
+  auto_deploy = true
+}
+
+# Lambda Function
+resource "aws_lambda_function" "job_submitter" {
+  function_name = "precise-mrd-job-submitter"
+  role          = aws_iam_role.lambda_exec_role.arn
+  handler       = "lambda_function.lambda_handler"
+  runtime       = "python3.11"
+  filename      = "../serverless/lambda_function.zip" # Placeholder
+
+  environment {
+    variables = {
+      JOB_QUEUE_ARN = aws_batch_job_queue.mrd_job_queue.arn
+      JOB_DEFINITION_ARN = aws_batch_job_definition.mrd_job_def.arn
+    }
+  }
+
+  tags = {
+    Environment = var.environment
+  }
+}
+
+resource "aws_iam_role" "lambda_exec_role" {
+  name = "precise-mrd-lambda-exec-role"
+  assume_role_policy = jsonencode({
+    Version   = "2012-10-17",
+    Statement = [{
+      Action    = "sts:AssumeRole",
+      Effect    = "Allow",
+      Principal = { Service = "lambda.amazonaws.com" }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "lambda_policy" {
+  name = "precise-mrd-lambda-policy"
+  role = aws_iam_role.lambda_exec_role.id
+  policy = jsonencode({
+    Version   = "2012-10-17",
+    Statement = [
+      {
+        Effect   = "Allow",
+        Action   = "batch:SubmitJob",
+        Resource = "*"
+      },
+      {
+        Effect   = "Allow",
+        Action   = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ],
+        Resource = "arn:aws:logs:*:*:*"
+      }
+    ]
+  })
+}
+
+resource "aws_lambda_permission" "api_gateway_permission" {
+  statement_id  = "AllowAPIGatewayInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.job_submitter.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_apigatewayv2_api.mrd_api.execution_arn}/*/*"
+}
 # CloudWatch Log Group
 resource "aws_cloudwatch_log_group" "mrd_logs" {
   name              = "/ecs/precise-mrd-api"
@@ -360,6 +434,22 @@ output "load_balancer_dns_name" {
 
 output "api_endpoint" {
   description = "API endpoint URL"
-  value       = "http://${aws_lb.mrd_lb.dns_name}"
+  value       = aws_apigatewayv2_api.mrd_api.api_endpoint
 }
+
+output "ecr_repository_url" {
+  description = "URL of the ECR repository"
+  value       = aws_ecr_repository.mrd_ecr.repository_url
+}
+
+output "batch_job_queue_arn" {
+  description = "ARN of the AWS Batch Job Queue"
+  value       = aws_batch_job_queue.mrd_job_queue.arn
+}
+
+output "batch_job_definition_arn" {
+  description = "ARN of the AWS Batch Job Definition"
+  value       = aws_batch_job_definition.mrd_job_def.arn
+}
+
 
