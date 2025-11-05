@@ -19,3 +19,4 @@ class ArtifactValidationError(PreciseMRDError):
 class FileOperationError(PreciseMRDError):
     """Raised for errors related to file I/O."""
     pass
+

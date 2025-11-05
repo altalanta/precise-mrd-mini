@@ -34,3 +34,4 @@ def get_logger(name: str) -> structlog.stdlib.BoundLogger:
     """Get a configured logger for a specific module."""
     return structlog.get_logger(name)
 
+
