@@ -147,3 +147,9 @@ all-dvc: dvc-setup
 .PHONY: profile
 profile:
 	$(UV) run python profile_pipeline.py
+
+.PHONY: mlflow-ui
+mlflow-ui:
+	@echo "Starting MLflow UI..."
+	@echo "Access it at http://127.0.0.1:5000"
+	@$(UV) run mlflow ui
