@@ -58,7 +58,8 @@ dev = [
     "ipykernel==6.29.5",
     "pre-commit==3.7.1",
     "structlog==24.3.0",
-    "snakeviz==2.2.0"
+    "snakeviz==2.2.0",
+    "mlflow==2.15.0"
 ]
 docs = [
     "mkdocs-material>=9.0.0",
