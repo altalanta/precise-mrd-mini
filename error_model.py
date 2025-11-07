@@ -121,7 +121,7 @@ def fit_error_model(
         return df
 
     # Original simple error model
-    
+
     # Define trinucleotide contexts
     contexts = [
         'AAA', 'AAC', 'AAG', 'AAT',
@@ -141,19 +141,19 @@ def fit_error_model(
         'TGA', 'TGC', 'TGG', 'TGT',
         'TTA', 'TTC', 'TTG', 'TTT'
     ]
-    
+
     # Fit error rates for each trinucleotide context
     error_data = []
-    
+
     for context in contexts:
         # Estimate error rate from negative control samples (lowest AF)
         negative_samples = collapsed_df[collapsed_df['allele_fraction'] <= 0.0001]
-        
+
         if len(negative_samples) == 0:
             # Fallback to lowest AF samples
             min_af = collapsed_df['allele_fraction'].min()
             negative_samples = collapsed_df[collapsed_df['allele_fraction'] == min_af]
-        
+
         # Count variants in negative samples for this context
         if len(negative_samples) > 0:
             variant_rate = negative_samples['is_variant'].mean()
@@ -163,25 +163,25 @@ def fit_error_model(
         else:
             # Default error rate
             error_rate = rng.uniform(1e-5, 1e-3)
-        
+
         # Confidence interval from bootstrap
         if len(negative_samples) > 10:
             bootstrap_rates = []
             for _ in range(100):
                 boot_sample = negative_samples.sample(
-                    n=len(negative_samples), 
-                    replace=True, 
+                    n=len(negative_samples),
+                    replace=True,
                     random_state=rng.integers(0, 2**32-1)
                 )
                 boot_rate = boot_sample['is_variant'].mean() * context_modifier
                 bootstrap_rates.append(boot_rate)
-            
+
             ci_lower = np.percentile(bootstrap_rates, 2.5)
             ci_upper = np.percentile(bootstrap_rates, 97.5)
         else:
             ci_lower = error_rate * 0.5
             ci_upper = error_rate * 2.0
-        
+
         error_data.append({
             'trinucleotide_context': context,
             'error_rate': error_rate,
@@ -190,7 +190,7 @@ def fit_error_model(
             'n_observations': len(negative_samples),
             'config_hash': config.config_hash(),
         })
-    
+
     df = pd.DataFrame(error_data)
 
     # Save to cache for future use

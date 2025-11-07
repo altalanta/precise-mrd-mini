@@ -326,7 +326,7 @@ class MRDDashboard:
                         st.json(results['artifacts'])
                     else:
                         st.info("No artifacts available.")
-                
+
                 with tab4:
                     if 'run_context' in results:
                         st.json(results['run_context'])
@@ -405,7 +405,7 @@ class MRDDashboard:
         st.subheader("Current Pipeline Configuration")
 
         st.info("This section shows the default `smoke.yaml` config. Use the builder or templates to create and upload your own.")
-        
+
         try:
             # Use the cached function to load the config
             config = get_config("configs/smoke.yaml")
@@ -732,6 +732,3 @@ def run_dashboard():
 
 if __name__ == "__main__":
     run_dashboard()
-
-
-
