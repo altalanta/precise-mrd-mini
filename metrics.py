@@ -119,40 +119,40 @@ def bootstrap_metric(
 
 
 def calibration_analysis(
-    y_true: np.ndarray, 
-    y_prob: np.ndarray, 
+    y_true: np.ndarray,
+    y_prob: np.ndarray,
     n_bins: int = 10
 ) -> list[Dict[str, Any]]:
     """Analyze prediction calibration.
-    
+
     Args:
         y_true: True binary labels
         y_prob: Predicted probabilities
         n_bins: Number of calibration bins
-        
+
     Returns:
         List of calibration bin statistics
     """
     bins = np.linspace(0, 1, n_bins + 1)
     calibration_data = []
-    
+
     for i in range(n_bins):
         bin_lower = bins[i]
         bin_upper = bins[i + 1]
-        
+
         # Find predictions in this bin
         in_bin = (y_prob >= bin_lower) & (y_prob < bin_upper)
-        
+
         if i == n_bins - 1:  # Last bin includes upper bound
             in_bin = (y_prob >= bin_lower) & (y_prob <= bin_upper)
-        
+
         if np.sum(in_bin) == 0:
             continue
-        
+
         bin_count = np.sum(in_bin)
         bin_event_rate = np.mean(y_true[in_bin])
         bin_confidence = np.mean(y_prob[in_bin])
-        
+
         calibration_data.append({
             "bin": i,
             "lower": bin_lower,
@@ -161,7 +161,7 @@ def calibration_analysis(
             "event_rate": float(bin_event_rate),
             "confidence": float(bin_confidence)
         })
-    
+
     return calibration_data
 
 
@@ -196,7 +196,7 @@ def calculate_metrics(
             "total_cases": 0,
             "calibration": []
         }
-    
+
     # Define truth labels (high AF = positive case)
     if 'allele_fraction' in calls_df.columns:
         y_true = (calls_df['allele_fraction'] > 0.001).astype(int)
@@ -205,7 +205,7 @@ def calculate_metrics(
         # Use a default approach or skip certain metrics
         print("  Warning: No allele_fraction column found, using simplified metrics")
         y_true = np.zeros(len(calls_df))  # All negative for compatibility
-    
+
     # Use variant fraction as prediction score
     if 'variant_fraction' in calls_df.columns:
         y_score = calls_df['variant_fraction'].values
@@ -217,11 +217,11 @@ def calculate_metrics(
             y_score = 1.0 - calls_df['p_value'].values  # Convert p-value to score
         else:
             y_score = np.random.random(len(calls_df))  # Random fallback
-    
+
     # Basic metrics
     roc_auc = roc_auc_score(y_true, y_score)
     avg_precision = average_precision(y_true, y_score)
-    
+
     # Confidence intervals
     if use_advanced_ci and config:
         print("  Using advanced confidence interval methods...")
@@ -244,7 +244,7 @@ def calculate_metrics(
         # Standard bootstrap CI (parallel processing)
         roc_ci = bootstrap_metric(y_true, y_score, roc_auc_score, n_bootstrap, rng, n_jobs)
         ap_ci = bootstrap_metric(y_true, y_score, average_precision, n_bootstrap, rng, n_jobs)
-    
+
     # Detection statistics
     if 'significant' in calls_df.columns:
         if 'allele_fraction' in calls_df.columns:
@@ -257,13 +257,13 @@ def calculate_metrics(
     else:
         detected_cases = 0
         total_cases = len(calls_df)
-    
+
     # Calibration analysis
     calibration = calibration_analysis(y_true, y_score)
-    
+
     # Brier score
     brier_score = float(np.mean((y_score - y_true) ** 2))
-    
+
     # Add statistical validation if requested
     validation_results = {}
     if run_validation and config:
