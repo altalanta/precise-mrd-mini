@@ -12,11 +12,12 @@ from .collapse import collapse_umis
 from .config import PipelineConfig, load_config
 from .determinism_utils import set_global_seed, write_manifest
 from .error_model import fit_error_model
+from .exceptions import DataProcessingError
 from .logging_config import get_logger
 from .metrics import calculate_metrics
 from .reporting import render_report
 from .simulate import simulate_reads
-from .utils import PipelineIO
+from .utils import PipelineIO, get_package_versions
 
 if TYPE_CHECKING:
     from .api import JobManager, PipelineConfigRequest
@@ -111,6 +112,9 @@ class PipelineService:
                     "parallel": config_request.use_parallel,
                     "ml_calling": config_request.use_ml_calling, "ml_model_type": config_request.ml_model_type,
                     "deep_learning": config_request.use_deep_learning, "dl_model_type": config_request.dl_model_type
+                },
+                "environment": {
+                    "package_versions": get_package_versions()
                 }
             }
 
@@ -121,8 +125,12 @@ class PipelineService:
             PipelineIO.save_json(run_context, str(context_path))
             render_report(calls_df, metrics, config.to_dict(), run_context, str(report_path))
 
-            manifest_path = reports_dir / "hash_manifest.txt"
-            write_manifest([metrics_path, context_path, report_path], out_manifest=manifest_path)
+            manifest_path = reports_dir / "hash_manifest.json"
+            artifact_paths = [str(p) for p in [
+                reads_path, collapsed_path, error_model_path, calls_path,
+                metrics_path, context_path, report_path
+            ]]
+            write_manifest(artifact_paths, out_manifest=str(manifest_path))
 
             job_manager.update_job_status(job_id, 'completed', 100.0)
             results = {
@@ -140,3 +148,9 @@ class PipelineService:
         except Exception as e:
             job_log.error("Pipeline job failed", error=str(e), exc_info=True)
             job_manager.update_job_status(job_id, 'failed', error=str(e))
+        except Exception as e:
+            job_log.error("An unexpected error occurred in the pipeline job", error=str(e), exc_info=True)
+            job_manager.update_job_status(job_id, 'failed', error="An unexpected server error occurred.")
+            # We wrap the original exception in a DataProcessingError to standardize
+            raise DataProcessingError(f"Pipeline job {job_id} failed: {e}") from e
+
