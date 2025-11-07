@@ -6,39 +6,29 @@ import hashlib
 import json
 import yaml
 import re
-from dataclasses import dataclass, asdict, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union, Callable, Type
 from abc import ABC, abstractmethod
 import copy
+from pydantic import BaseModel, Field, validator
+
+from .exceptions import ConfigurationError
 
 
-@dataclass
-class SimulationConfig:
+class SimulationConfig(BaseModel):
     """Configuration for simulation parameters."""
     allele_fractions: List[float]
     umi_depths: List[int]
     n_replicates: int
     n_bootstrap: int
 
-    def __post_init__(self):
-        """Validate simulation configuration after initialization."""
-        self._validate()
-
-    def _validate(self):
-        """Validate simulation configuration parameters."""
-        if not self.allele_fractions:
-            raise ValueError("allele_fractions cannot be empty")
-        if any(af < 0 or af > 1 for af in self.allele_fractions):
-            raise ValueError("allele_fractions must be between 0 and 1")
-        if not self.umi_depths:
-            raise ValueError("umi_depths cannot be empty")
-        if any(depth <= 0 for depth in self.umi_depths):
-            raise ValueError("umi_depths must be positive")
-        if self.n_replicates <= 0:
-            raise ValueError("n_replicates must be positive")
-        if self.n_bootstrap <= 0:
-            raise ValueError("n_bootstrap must be positive")
+    @validator('allele_fractions')
+    def validate_allele_fractions(cls, v):
+        if not v:
+            raise ConfigurationError("allele_fractions cannot be empty")
+        if any(af < 0 or af > 1 for af in v):
+            raise ConfigurationError("allele_fractions must be between 0 and 1")
+        return v
 
     def get_estimated_runtime(self) -> float:
         """Estimate runtime in minutes based on configuration."""
@@ -70,28 +60,36 @@ class SimulationConfig:
         return adapted
 
 
-@dataclass
-class UMIConfig:
+class UMIConfig(BaseModel):
     """Configuration for UMI processing."""
     min_family_size: int
     max_family_size: int
     quality_threshold: int
     consensus_threshold: float
 
-    def __post_init__(self):
-        """Validate UMI configuration after initialization."""
-        self._validate()
+    @validator('min_family_size')
+    def validate_min_family_size(cls, v):
+        if v <= 0:
+            raise ConfigurationError("min_family_size must be positive")
+        return v
 
-    def _validate(self):
-        """Validate UMI configuration parameters."""
-        if self.min_family_size <= 0:
-            raise ValueError("min_family_size must be positive")
-        if self.max_family_size < self.min_family_size:
-            raise ValueError("max_family_size must be >= min_family_size")
-        if not 0 <= self.quality_threshold <= 60:
-            raise ValueError("quality_threshold must be between 0 and 60")
-        if not 0 <= self.consensus_threshold <= 1:
-            raise ValueError("consensus_threshold must be between 0 and 1")
+    @validator('max_family_size')
+    def validate_max_family_size(cls, v, values):
+        if 'min_family_size' in values and v < values['min_family_size']:
+            raise ConfigurationError("max_family_size must be >= min_family_size")
+        return v
+
+    @validator('quality_threshold')
+    def validate_quality_threshold(cls, v):
+        if not 0 <= v <= 60:
+            raise ConfigurationError("quality_threshold must be between 0 and 60")
+        return v
+
+    @validator('consensus_threshold')
+    def validate_consensus_threshold(cls, v):
+        if not 0 <= v <= 1:
+            raise ConfigurationError("consensus_threshold must be between 0 and 1")
+        return v
 
     def adapt_to_data_quality(self, quality_stats: Dict[str, Any]) -> 'UMIConfig':
         """Adapt UMI configuration based on data quality characteristics."""
@@ -114,29 +112,31 @@ class UMIConfig:
         return adapted
 
 
-@dataclass
-class StatsConfig:
+class StatsConfig(BaseModel):
     """Configuration for statistical testing."""
     test_type: str
     alpha: float
     fdr_method: str
 
-    def __post_init__(self):
-        """Validate statistical configuration after initialization."""
-        self._validate()
-
-    def _validate(self):
-        """Validate statistical configuration parameters."""
+    @validator('test_type')
+    def validate_test_type(cls, v):
         valid_test_types = ['poisson', 'binomial', 'fisher']
-        if self.test_type not in valid_test_types:
-            raise ValueError(f"test_type must be one of {valid_test_types}")
+        if v not in valid_test_types:
+            raise ConfigurationError(f"test_type must be one of {valid_test_types}")
+        return v
 
-        if not 0 < self.alpha < 1:
-            raise ValueError("alpha must be between 0 and 1")
+    @validator('alpha')
+    def validate_alpha(cls, v):
+        if not 0 < v < 1:
+            raise ConfigurationError("alpha must be between 0 and 1")
+        return v
 
+    @validator('fdr_method')
+    def validate_fdr_method(cls, v):
         valid_fdr_methods = ['benjamini_hochberg', 'bonferroni', 'holm']
-        if self.fdr_method not in valid_fdr_methods:
-            raise ValueError(f"fdr_method must be one of {valid_fdr_methods}")
+        if v not in valid_fdr_methods:
+            raise ConfigurationError(f"fdr_method must be one of {valid_fdr_methods}")
+        return v
 
     def get_power_analysis_config(self) -> Dict[str, Any]:
         """Get configuration for power analysis."""
@@ -148,22 +148,22 @@ class StatsConfig:
         }
 
 
-@dataclass
-class LODConfig:
+class LODConfig(BaseModel):
     """Configuration for LoD estimation."""
     detection_threshold: float
     confidence_level: float
 
-    def __post_init__(self):
-        """Validate LOD configuration after initialization."""
-        self._validate()
+    @validator('detection_threshold')
+    def validate_detection_threshold(cls, v):
+        if not 0 < v < 1:
+            raise ConfigurationError("detection_threshold must be between 0 and 1")
+        return v
 
-    def _validate(self):
-        """Validate LOD configuration parameters."""
-        if not 0 < self.detection_threshold < 1:
-            raise ValueError("detection_threshold must be between 0 and 1")
-        if not 0 < self.confidence_level < 1:
-            raise ValueError("confidence_level must be between 0 and 1")
+    @validator('confidence_level')
+    def validate_confidence_level(cls, v):
+        if not 0 < v < 1:
+            raise ConfigurationError("confidence_level must be between 0 and 1")
+        return v
 
     def get_bootstrap_config(self) -> Dict[str, Any]:
         """Get bootstrap configuration for LOD estimation."""
@@ -174,8 +174,7 @@ class LODConfig:
         }
 
 
-@dataclass
-class FASTQConfig:
+class FASTQConfig(BaseModel):
     """Configuration for FASTQ file processing."""
     input_path: str
     max_reads: Optional[int] = None
@@ -183,20 +182,29 @@ class FASTQConfig:
     quality_threshold: int = 20
     min_family_size: int = 3
 
-    def __post_init__(self):
-        """Validate FASTQ configuration after initialization."""
-        self._validate()
+    @validator('input_path')
+    def validate_input_path(cls, v):
+        if not v:
+            raise ConfigurationError("input_path cannot be empty")
+        return v
 
-    def _validate(self):
-        """Validate FASTQ configuration parameters."""
-        if not self.input_path:
-            raise ValueError("input_path cannot be empty")
-        if self.max_reads is not None and self.max_reads <= 0:
-            raise ValueError("max_reads must be positive")
-        if not 0 <= self.quality_threshold <= 60:
-            raise ValueError("quality_threshold must be between 0 and 60")
-        if self.min_family_size <= 0:
-            raise ValueError("min_family_size must be positive")
+    @validator('max_reads')
+    def validate_max_reads(cls, v):
+        if v is not None and v <= 0:
+            raise ConfigurationError("max_reads must be positive")
+        return v
+
+    @validator('quality_threshold')
+    def validate_quality_threshold(cls, v):
+        if not 0 <= v <= 60:
+            raise ConfigurationError("quality_threshold must be between 0 and 60")
+        return v
+
+    @validator('min_family_size')
+    def validate_min_family_size(cls, v):
+        if v <= 0:
+            raise ConfigurationError("min_family_size must be positive")
+        return v
 
 
 class ConfigurationTemplate(ABC):
@@ -213,8 +221,7 @@ class ConfigurationTemplate(ABC):
         pass
 
 
-@dataclass
-class ConfigVersion:
+class ConfigVersion(BaseModel):
     """Configuration version information."""
     major: int
     minor: int
@@ -228,8 +235,7 @@ class ConfigVersion:
         return (self.major, self.minor, self.patch) < (other.major, other.minor, other.patch)
 
 
-@dataclass
-class PipelineConfig:
+class PipelineConfig(BaseModel):
     """Enhanced main pipeline configuration with inheritance and validation."""
     run_id: str
     seed: int
@@ -238,46 +244,20 @@ class PipelineConfig:
     lod: LODConfig
     simulation: Optional[SimulationConfig] = None
     fastq: Optional[FASTQConfig] = None
-    # New fields for enhanced configuration management
     config_version: str = "2.0.0"
     parent_config: Optional[str] = None
     template: Optional[str] = None
-    tags: List[str] = field(default_factory=list)
+    tags: List[str] = Field(default_factory=list)
     description: str = ""
     created_at: Optional[str] = None
     last_modified: Optional[str] = None
 
-    def __post_init__(self):
-        """Validate and enhance configuration after initialization."""
-        self._validate()
+    class Config:
+        validate_assignment = True
+
+    def __init__(self, **data):
+        super().__init__(**data)
         self._set_timestamps()
-
-    def _validate(self):
-        """Comprehensive validation of pipeline configuration."""
-        if not self.run_id:
-            raise ValueError("run_id cannot be empty")
-        if self.seed < 0:
-            raise ValueError("seed must be non-negative")
-
-        # Validate component configurations
-        self.umi._validate()
-        self.stats._validate()
-        self.lod._validate()
-
-        if self.simulation:
-            self.simulation._validate()
-        if self.fastq:
-            self.fastq._validate()
-
-        # Validate configuration consistency
-        self._validate_consistency()
-
-    def _validate_consistency(self):
-        """Validate configuration consistency across components."""
-        # Ensure simulation and FASTQ configs don't conflict
-        if self.simulation and self.fastq:
-            # If both are present, ensure they make sense together
-            pass  # Add specific validation rules as needed
 
     def _set_timestamps(self):
         """Set creation and modification timestamps."""
@@ -289,26 +269,11 @@ class PipelineConfig:
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert config to dictionary with metadata."""
-        result = asdict(self)
-        result['config_version'] = str(self.config_version)
-        return result
+        return self.model_dump(mode='json')
 
     def config_hash(self) -> str:
         """Compute deterministic hash of configuration."""
-        # Include version and parent info for more robust hashing
-        config_str = json.dumps({
-            'version': self.config_version,
-            'parent': self.parent_config,
-            'core_config': {
-                'run_id': self.run_id,
-                'seed': self.seed,
-                'umi': self.umi.__dict__,
-                'stats': self.stats.__dict__,
-                'lod': self.lod.__dict__,
-                'simulation': self.simulation.__dict__ if self.simulation else None,
-                'fastq': self.fastq.__dict__ if self.fastq else None,
-            }
-        }, sort_keys=True)
+        config_str = self.model_dump_json(exclude={'created_at', 'last_modified'})
         return hashlib.sha256(config_str.encode()).hexdigest()[:16]
 
     def get_estimated_runtime(self) -> float:
@@ -370,7 +335,7 @@ class PipelineConfig:
             merged = copy.deepcopy(self)
             # Apply inheritance logic here
         else:
-            raise ValueError(f"Unknown merge strategy: {strategy}")
+            raise ConfigurationError(f"Unknown merge strategy: {strategy}")
 
         merged.parent_config = self.run_id
         merged.last_modified = None  # Will be set by __post_init__
@@ -414,30 +379,10 @@ def load_config(path: str | Path, auto_migrate: bool = True) -> PipelineConfig:
     with open(path, 'r') as f:
         data = yaml.safe_load(f)
 
-    # Handle legacy configurations without version info
-    if 'config_version' not in data:
-        data['config_version'] = "1.0.0"
-
-    # Auto-migrate to latest version if requested
     if auto_migrate:
         data = ConfigVersionManager.migrate_config(data)
-
-    # Map old format to new format if needed
-    if 'simulation' in data and data['simulation']:
-        data['simulation'] = _migrate_simulation_config(data['simulation'])
-
-    return PipelineConfig(
-        run_id=data.get('run_id', 'unnamed_run'),
-        seed=data.get('seed', 7),
-        simulation=SimulationConfig(**data['simulation']) if data.get('simulation') else None,
-        umi=UMIConfig(**data['umi']),
-        stats=StatsConfig(**data['stats']),
-        lod=LODConfig(**data['lod']),
-        fastq=FASTQConfig(**data['fastq']) if data.get('fastq') else None,
-        config_version=data.get('config_version', '2.0.0'),
-        description=data.get('description', ''),
-        tags=data.get('tags', [])
-    )
+    
+    return PipelineConfig(**data)
 
 
 def dump_config(config: PipelineConfig, path: str | Path) -> None:
@@ -536,7 +481,7 @@ class ConfigVersionManager:
         """Parse version string into ConfigVersion object."""
         parts = version_str.split('.')
         if len(parts) != 3:
-            raise ValueError(f"Invalid version format: {version_str}")
+            raise ConfigurationError(f"Invalid version format: {version_str}")
 
         return ConfigVersion(
             major=int(parts[0]),
@@ -557,7 +502,8 @@ class ConfigValidator:
 
         try:
             # Basic validation is already done in __post_init__
-            config._validate()
+            config._set_timestamps() # Ensure timestamps are set for validation
+            config.model_dump() # Use model_dump for validation
         except ValueError as e:
             issues.append(f"Validation error: {e}")
 

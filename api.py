@@ -21,6 +21,7 @@ import pandas as pd
 from .config import PipelineConfig, load_config, dump_config, ConfigValidator
 from .pipeline_service import PipelineService
 from .logging_config import setup_logging, get_logger
+from .exceptions import ConfigurationError, DataProcessingError
 
 log = get_logger(__name__)
 
@@ -271,6 +272,8 @@ async def submit_pipeline_job(
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to submit job: {str(e)}")
+    except ConfigurationError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid configuration provided: {e}")
 
 
 @app.get("/status/{job_id}", response_model=JobStatus)
@@ -348,7 +351,12 @@ async def list_jobs(limit: int = Query(50, description="Maximum number of jobs t
 def pipeline_background_task(job_id: str, config_request: PipelineConfigRequest):
     """Wrapper to run the pipeline service in the background."""
     service = PipelineService()
-    service.run(job_id=job_id, config_request=config_request, job_manager=job_manager)
+    try:
+        service.run(job_id=job_id, config_request=config_request, job_manager=job_manager)
+    except DataProcessingError as e:
+        log.error("Background task failed with a data processing error", error=str(e))
+    except Exception as e:
+        log.error("An unexpected error occurred in background task", error=str(e))
 
 
 @app.post("/validate-config", response_model=ValidationResponse)
@@ -364,18 +372,13 @@ async def validate_configuration(config_yaml: str = Form(...)):
             config = load_config(config_path)
             validation_result = ConfigValidator.validate_config(config)
 
-            return {
-                'is_valid': validation_result['is_valid'],
-                'issues': validation_result['issues'],
-                'warnings': validation_result['warnings'],
-                'suggestions': validation_result['suggestions'],
-                'estimated_runtime_minutes': validation_result['estimated_runtime_minutes'],
-                'config_hash': validation_result['config_hash']
-            }
+            return validation_result
 
         finally:
             Path(config_path).unlink()
 
+    except ConfigurationError as e:
+        raise HTTPException(status_code=400, detail=f"Configuration validation failed: {e}")
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Configuration validation failed: {str(e)}")
 
@@ -409,19 +412,21 @@ async def create_config_from_template(
         template = PredefinedTemplates.get_production_template()
     else:
         raise HTTPException(status_code=400, detail=f"Unknown template: {template_name}")
+    try:
+        config = PipelineConfig.from_template(template, run_id)
+        config.seed = seed
 
-    config = PipelineConfig.from_template(template, run_id)
-    config.seed = seed
-
-    return {
-        'config_yaml': dump_config(config, None),  # Returns YAML string
-        'config_summary': {
-            'run_id': config.run_id,
-            'seed': config.seed,
-            'config_version': config.config_version,
-            'template': template_name
+        return {
+            'config_yaml': dump_config(config, None),  # Returns YAML string
+            'config_summary': {
+                'run_id': config.run_id,
+                'seed': config.seed,
+                'config_version': config.config_version,
+                'template': template_name
+            }
         }
-    }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to create config from template: {e}")
 
 
 def create_api_app() -> FastAPI:
