@@ -41,3 +41,5 @@ class VariantCaller(ABC):
         """
         raise NotImplementedError
 
+
+

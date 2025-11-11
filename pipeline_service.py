@@ -28,6 +28,10 @@ log = get_logger(__name__)
 class PipelineService:
     """Encapsulates the core logic for running the MRD pipeline."""
 
+    def __init__(self):
+        self.results_dir = Path("api_results")
+        self.results_dir.mkdir(exist_ok=True)
+
     def run(
         self,
         job_id: str,
@@ -58,7 +62,7 @@ class PipelineService:
             job_manager.update_job_status(job_id, 'running', 20.0)
             job_log.info("Configuration loaded", config_hash=config.config_hash())
 
-            job_dir = job_manager.results_dir / job_id
+            job_dir = self.results_dir / job_id
             job_dir.mkdir(exist_ok=True)
             reports_dir = job_dir / "reports"
             reports_dir.mkdir(exist_ok=True)
