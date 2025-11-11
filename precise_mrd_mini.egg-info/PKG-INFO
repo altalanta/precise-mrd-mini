@@ -24,10 +24,10 @@ License: MIT License
         LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
         OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
         SOFTWARE.
+        
 Requires-Python: <3.13,>=3.10
 Description-Content-Type: text/markdown
 License-File: LICENSE
-License-File: LICENSE 2
 Requires-Dist: numpy==1.26.4
 Requires-Dist: pandas==2.2.2
 Requires-Dist: scipy==1.13.1
@@ -56,6 +56,8 @@ Requires-Dist: httpx==0.27.2
 Requires-Dist: streamlit==1.39.0
 Requires-Dist: plotly==5.24.1
 Requires-Dist: streamlit-plotly-events==0.0.6
+Requires-Dist: sqlalchemy>=2.0.44
+Requires-Dist: celery[redis]>=5.6.0rc1
 Provides-Extra: dev
 Requires-Dist: pytest==8.3.3; extra == "dev"
 Requires-Dist: pytest-cov==5.0.0; extra == "dev"
@@ -66,6 +68,12 @@ Requires-Dist: hypothesis==6.112.1; extra == "dev"
 Requires-Dist: types-PyYAML==6.0.12.20240917; extra == "dev"
 Requires-Dist: twine==5.1.1; extra == "dev"
 Requires-Dist: dvc[s3]==3.50.0; extra == "dev"
+Requires-Dist: papermill==2.5.0; extra == "dev"
+Requires-Dist: ipykernel==6.29.5; extra == "dev"
+Requires-Dist: pre-commit==3.7.1; extra == "dev"
+Requires-Dist: structlog==24.3.0; extra == "dev"
+Requires-Dist: snakeviz==2.2.0; extra == "dev"
+Requires-Dist: mlflow==2.15.0; extra == "dev"
 Provides-Extra: docs
 Requires-Dist: mkdocs-material>=9.0.0; extra == "docs"
 Requires-Dist: mkdocs-gen-files>=0.5.0; extra == "docs"
@@ -79,6 +87,8 @@ Dynamic: license-file
 [![Docs](https://img.shields.io/badge/docs-mkdocs-blue)](https://altalanta.github.io/precise-mrd-mini/)
 [![Python 3.11](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Tests](https://github.com/murphy-lab/precise-mrd-mini/actions/workflows/main.yml/badge.svg)](https://github.com/murphy-lab/precise-mrd-mini/actions/workflows/main.yml)
+[![Coverage Status](https://img.shields.io/codecov/c/github/murphy-lab/precise-mrd-mini.svg)](https://codecov.io/gh/murphy-lab/precise-mrd-mini)
 
 A ctDNA/UMI toy MRD pipeline with **formal detection limit analytics**, deterministic error modeling, statistical validation, and comprehensive CI/CD hardening.
 
@@ -125,6 +135,13 @@ A ctDNA/UMI toy MRD pipeline with **formal detection limit analytics**, determin
 - Remote storage support for large datasets
 - Systematic comparison of different configurations
 
+🧪 **Comprehensive Integration Testing** ⭐
+- End-to-end pipeline validation across diverse configurations
+- Contamination scenario testing with realistic noise models
+- Stratified analysis validation across genomic contexts
+- Deterministic behavior verification with hash-based validation
+- Performance regression testing and parameter sensitivity analysis
+
 📚 **Documentation** ⭐
 - Complete MkDocs site with GitHub Pages deployment
 - Comprehensive evaluation methodology documentation
@@ -149,6 +166,22 @@ make smoke-dvc                    # Smoke test with DVC tracking
 make eval-dvc                     # All evaluations with DVC
 make dvc-experiment name=test     # Run parameter experiments
 dvc exp show                      # Compare experiments
+```
+
+## Integration Testing
+
+Comprehensive end-to-end testing across various scenarios:
+
+```bash
+make test-integration-quick       # Fast integration tests (~2 min)
+make test-integration-full        # Complete test suite (~15 min)
+make test-contamination          # Contamination analysis tests
+make test-stratified             # Stratified analysis tests
+make test-determinism            # Deterministic behavior tests
+
+# Or use the test runner directly
+python tests/integration/run_integration_tests.py quick
+python tests/integration/run_integration_tests.py full
 ```
 
 ## Tutorials ⭐
@@ -268,7 +301,7 @@ All JSON artifacts carry explicit schema versions and are validated via
 - Trinucleotide context-aware error modeling
 - Deterministic family size distributions
 
-### 2. UMI Collapse (`collapse_umis`) 
+### 2. UMI Collapse (`collapse_umis`)
 - Quality-weighted consensus calling
 - Configurable family size thresholds
 - Consensus agreement filtering
@@ -326,8 +359,15 @@ precise-mrd determinism-check --seed 7
 ### Running Tests
 
 ```bash
-# All tests
+# Unit tests (fast)
 make test
+
+# Integration tests (comprehensive)
+make test-integration-quick       # Quick subset (~2 min)
+make test-integration-full        # Complete suite (~15 min)
+make test-contamination          # Contamination scenarios
+make test-stratified             # Stratified analysis
+make test-determinism            # Deterministic behavior
 
 # Test coverage
 make coverage
@@ -361,7 +401,7 @@ The CI includes **fail-closed** jobs:
 The pipeline includes lightweight statistical tests:
 
 - **Type I Error Control**: Validates α-level control in hypothesis testing
-- **FDR Monotonicity**: Ensures BH correction is properly implemented  
+- **FDR Monotonicity**: Ensures BH correction is properly implemented
 - **Bootstrap Coverage**: Verifies CI coverage on synthetic data
 
 All tests run in <60s for CI efficiency.
@@ -375,7 +415,7 @@ Use `make clean-safe` instead to clean only generated artifacts.
 ## Performance
 
 - **Smoke test**: <5 minutes on standard CI
-- **Statistical tests**: <60 seconds  
+- **Statistical tests**: <60 seconds
 - **Memory usage**: ~200MB peak for smoke test
 
 ## Limitations
