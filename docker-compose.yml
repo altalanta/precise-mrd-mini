@@ -4,45 +4,35 @@ services:
   api:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.cpu
     ports:
       - "8000:8000"
     environment:
-      - PRECISE_MRD_LOG_LEVEL=INFO
-      - PRECISE_MRD_API_HOST=0.0.0.0
-      - PRECISE_MRD_API_PORT=8000
-      - ENABLE_PARALLEL_PROCESSING=true
-      - ENABLE_ML_CALLING=true
-      - ENABLE_DEEP_LEARNING=true
-      - MAX_CONCURRENT_JOBS=5
-    volumes:
-      - data_volume:/app/data
-      - results_volume:/app/api_results
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    deploy:
-      resources:
-        limits:
-          memory: 2G
-          cpus: '1.0'
-        reservations:
-          memory: 512M
-          cpus: '0.5'
+      - PYTHONPATH=/app
+      - DATABASE_URL=sqlite:////app/jobs.db
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis
 
-  # Optional: Redis for job queuing (can be replaced with cloud services)
   redis:
     image: redis:7-alpine
     ports:
       - "6379:6379"
+
+  celery_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.cpu
+    command: ["./run-celery.sh"]
     volumes:
-      - redis_data:/data
-    command: redis-server --appendonly yes
-    profiles:
-      - with-redis
+      - .:/app
+    environment:
+      - PYTHONPATH=/app
+      - DATABASE_URL=sqlite:////app/jobs.db
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis
+      - api
 
   # Optional: PostgreSQL for job metadata (can be replaced with cloud databases)
   postgres:
@@ -88,6 +78,8 @@ volumes:
 networks:
   default:
     name: mrd-network
+
+
 
 
 
