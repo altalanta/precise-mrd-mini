@@ -28,3 +28,5 @@ def log_experiment(params: Dict[str, Any], metrics: Dict[str, Any], artifacts: D
             mlflow.log_artifact(path, artifact_path=name)
         
         return run.info.run_id
+
+

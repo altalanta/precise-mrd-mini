@@ -118,3 +118,5 @@ class StatisticalVariantCaller(VariantCaller):
         
         return rejected, final_adjusted
 
+
+

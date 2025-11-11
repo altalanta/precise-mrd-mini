@@ -29,3 +29,5 @@ def write_manifest(file_paths: List[str], out_manifest: str) -> None:
 
 class ArtifactManager:
     """A simple manager to track artifacts and their hashes."""
+
+

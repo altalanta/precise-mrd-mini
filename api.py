@@ -11,191 +11,64 @@ from typing import Dict, List, Optional, Any
 from datetime import datetime
 import shutil
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks, File, UploadFile, Form, Query
+from fastapi import FastAPI, HTTPException, File, UploadFile, Form, Query, Depends
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 from pydantic import BaseModel, Field
 import pandas as pd
+from sqlalchemy.orm import Session
 
 from .config import PipelineConfig, load_config, dump_config, ConfigValidator
 from .pipeline_service import PipelineService
 from .logging_config import setup_logging, get_logger
 from .exceptions import ConfigurationError, DataProcessingError
+from .database import init_db, get_db, Job
+from .schemas import (
+    PipelineConfigRequest, JobStatus, JobListResponse, ValidationResponse,
+    TemplateListResponse, ConfigFromTemplateResponse, PipelineResults
+)
+from .job_manager import JobManager, get_job_manager
+from .tasks import run_pipeline_task
 
 log = get_logger(__name__)
-
-
-# Pydantic models for API requests/responses
-class PipelineConfigRequest(BaseModel):
-    """Request model for pipeline configuration."""
-    run_id: str = Field(..., description="Unique run identifier")
-    seed: int = Field(7, description="Random seed for reproducibility")
-    config_override: Optional[str] = Field(None, description="Custom configuration as YAML string")
-    use_parallel: bool = Field(False, description="Enable parallel processing")
-    use_ml_calling: bool = Field(False, description="Enable ML-based variant calling")
-    use_deep_learning: bool = Field(False, description="Enable deep learning variant calling")
-    ml_model_type: str = Field("ensemble", description="ML model type")
-    dl_model_type: str = Field("cnn_lstm", description="Deep learning model type")
-
-
-class JobStatus(BaseModel):
-    """Job status response model."""
-    job_id: str
-    status: str  # pending, running, completed, failed
-    progress: float
-    start_time: Optional[datetime]
-    end_time: Optional[datetime]
-    error_message: Optional[str]
-    results: Optional[Dict[str, Any]]
-
-
-class RootResponse(BaseModel):
-    """Response model for the root endpoint."""
-    name: str
-    version: str
-    description: str
-    endpoints: Dict[str, str]
-
-class HealthResponse(BaseModel):
-    """Response model for the health check endpoint."""
-    status: str
-    timestamp: datetime
-    version: str
-
-class JobListResponse(BaseModel):
-    """Response model for listing jobs."""
-    jobs: List[JobStatus]
-
-class ValidationResponse(BaseModel):
-    """Response model for configuration validation."""
-    is_valid: bool
-    issues: List[str]
-    warnings: List[str]
-    suggestions: List[str]
-    estimated_runtime_minutes: float
-    config_hash: str
-
-class TemplateListResponse(BaseModel):
-    """Response model for listing configuration templates."""
-    templates: List[Dict[str, Any]]
-
-class ConfigFromTemplateResponse(BaseModel):
-    """Response model for creating a configuration from a template."""
-    config_yaml: str
-    config_summary: Dict[str, Any]
-
-
-class PipelineResults(BaseModel):
-    """Pipeline execution results."""
-    job_id: str
-    run_id: str
-    config_hash: str
-    status: str
-    metrics: Dict[str, Any]
-    artifacts: Dict[str, str]
-    run_context: Dict[str, Any]
-
-
-# Global job management
-class JobManager:
-    """Manages asynchronous pipeline jobs."""
-
-    def __init__(self):
-        """Initialize job manager."""
-        self.jobs: Dict[str, Dict[str, Any]] = {}
-        self.results_dir = Path("api_results")
-        self.results_dir.mkdir(exist_ok=True)
-
-    def create_job(self, config_request: PipelineConfigRequest) -> str:
-        """Create a new pipeline job."""
-        job_id = str(uuid.uuid4())
-
-        self.jobs[job_id] = {
-            'job_id': job_id,
-            'status': 'pending',
-            'progress': 0.0,
-            'start_time': None,
-            'end_time': None,
-            'error_message': None,
-            'results': None,
-            'config_request': config_request.dict()
-        }
-
-        return job_id
-
-    def update_job_status(self, job_id: str, status: str, progress: float = None, error: str = None):
-        """Update job status and progress."""
-        if job_id not in self.jobs:
-            raise ValueError(f"Job {job_id} not found")
-
-        job = self.jobs[job_id]
-        job['status'] = status
-
-        if progress is not None:
-            job['progress'] = progress
-
-        if error:
-            job['error_message'] = error
-            job['status'] = 'failed'
-
-        if status == 'running' and job['start_time'] is None:
-            job['start_time'] = datetime.now()
-
-        if status in ['completed', 'failed'] and job['end_time'] is None:
-            job['end_time'] = datetime.now()
-
-    def get_job_status(self, job_id: str) -> JobStatus:
-        """Get job status."""
-        if job_id not in self.jobs:
-            raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
-
-        job = self.jobs[job_id]
-        return JobStatus(
-            job_id=job['job_id'],
-            status=job['status'],
-            progress=job['progress'],
-            start_time=job['start_time'],
-            end_time=job['end_time'],
-            error_message=job['error_message'],
-            results=job.get('results')
-        )
-
-    def set_job_results(self, job_id: str, results: Dict[str, Any]):
-        """Set job results."""
-        if job_id in self.jobs:
-            self.jobs[job_id]['results'] = results
-
-    def cleanup_old_jobs(self, max_age_hours: int = 24):
-        """Clean up old completed/failed jobs."""
-        cutoff_time = datetime.now().timestamp() - (max_age_hours * 3600)
-
-        to_remove = []
-        for job_id, job in self.jobs.items():
-            if job['end_time'] and job['end_time'].timestamp() < cutoff_time:
-                to_remove.append(job_id)
-
-        for job_id in to_remove:
-            del self.jobs[job_id]
-
-
-# Global job manager instance
-job_manager = JobManager()
 
 
 # FastAPI application
 app = FastAPI(
     title="Precise MRD Pipeline API",
-    description="REST API for the Precise MRD (Minimal Residual Disease) detection pipeline",
-    version="2.0.0",
+    description="""
+A robust, scalable, and reproducible REST API for the Precise MRD (Minimal Residual Disease) 
+detection pipeline.
+
+This API allows you to:
+- **Submit** new pipeline jobs with custom configurations.
+- **Monitor** the status and progress of ongoing jobs.
+- **Retrieve** detailed results and data artifacts from completed jobs.
+- **Validate** pipeline configurations before execution.
+- **Manage** jobs through a persistent, database-backed job store.
+
+Jobs are processed asynchronously by a distributed Celery task queue for scalability and reliability.
+    """,
+    version="3.0.0",
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
+    contact={
+        "name": "Development Team",
+        "url": "https://github.com/your-repo/precise-mrd-mini",
+        "email": "dev@example.com",
+    },
+    license_info={
+        "name": "MIT License",
+        "url": "https://opensource.org/licenses/MIT",
+    },
 )
 
 @app.on_event("startup")
 async def startup_event():
     """Configure logging on application startup."""
     setup_logging()
+    init_db()
     log.info("Application startup complete. Logging configured.")
 
 
@@ -209,43 +82,29 @@ app.add_middleware(
 )
 
 
-@app.get("/", response_model=RootResponse)
-async def root():
-    """Root endpoint with API information."""
-    return {
-        "name": "Precise MRD Pipeline API",
-        "version": "2.0.0",
-        "description": "REST API for MRD detection with parallel processing, ML, and deep learning",
-        "endpoints": {
-            "submit_job": "/submit",
-            "job_status": "/status/{job_id}",
-            "job_results": "/results/{job_id}",
-            "health": "/health"
-        }
-    }
-
-
-@app.get("/health", response_model=HealthResponse)
-async def health_check():
-    """Health check endpoint."""
-    return {
-        "status": "healthy",
-        "timestamp": datetime.now().isoformat(),
-        "version": "2.0.0"
-    }
-
-
-@app.post("/submit", response_model=JobStatus)
+@app.post(
+    "/submit", 
+    response_model=JobStatus,
+    summary="Submit a New Pipeline Job",
+    description="""
+    Submits a new MRD pipeline job for asynchronous execution. 
+    
+    The job is added to the Celery queue and will be picked up by an available worker. 
+    You can specify the run configuration using a combination of form fields and an optional 
+    YAML override.
+    """,
+    tags=["Jobs"],
+)
 async def submit_pipeline_job(
-    background_tasks: BackgroundTasks,
-    run_id: str = Form(..., description="Unique run identifier"),
-    seed: int = Form(7, description="Random seed for reproducibility"),
-    config_override: Optional[str] = Form(None, description="Custom configuration as YAML string"),
-    use_parallel: bool = Form(False, description="Enable parallel processing"),
-    use_ml_calling: bool = Form(False, description="Enable ML-based variant calling"),
-    use_deep_learning: bool = Form(False, description="Enable deep learning variant calling"),
-    ml_model_type: str = Form("ensemble", description="ML model type"),
-    dl_model_type: str = Form("cnn_lstm", description="Deep learning model type")
+    job_manager: JobManager = Depends(get_job_manager),
+    run_id: str = Form(..., description="A unique identifier for this specific run, e.g., 'patient_123_run_1'."),
+    seed: int = Form(7, description="The random seed for ensuring reproducibility of the simulation and analysis."),
+    config_override: Optional[str] = Form(None, description="A complete YAML configuration string to override all default parameters."),
+    use_parallel: bool = Form(False, description="Enable parallel processing for performance improvement on multi-core systems."),
+    use_ml_calling: bool = Form(False, description="Enable the machine learning-based variant calling model."),
+    use_deep_learning: bool = Form(False, description="Enable the deep learning (CNN-LSTM) variant calling model."),
+    ml_model_type: str = Form("ensemble", description="Specify the type of ML model to use (e.g., 'ensemble', 'random_forest')."),
+    dl_model_type: str = Form("cnn_lstm", description="Specify the type of deep learning model to use (e.g., 'cnn_lstm', 'transformer').")
 ):
     """Submit a pipeline job for execution."""
     try:
@@ -262,13 +121,12 @@ async def submit_pipeline_job(
         )
 
         # Create job
-        job_id = job_manager.create_job(config_request)
-        job_manager.update_job_status(job_id, 'running', 0.0)
+        job = job_manager.create_job(config_request)
+        # Dispatch the task to Celery
+        run_pipeline_task.delay(job.id, config_request.dict())
+        job_manager.update_job_status(job.id, 'queued', 0.0)
 
-        # Run pipeline in background
-        background_tasks.add_task(pipeline_background_task, job_id, config_request)
-
-        return job_manager.get_job_status(job_id)
+        return JobStatus(job_id=job.id, status='queued', progress=0.0, start_time=job.created_at)
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to submit job: {str(e)}")
@@ -276,41 +134,73 @@ async def submit_pipeline_job(
         raise HTTPException(status_code=400, detail=f"Invalid configuration provided: {e}")
 
 
-@app.get("/status/{job_id}", response_model=JobStatus)
-async def get_job_status(job_id: str):
+@app.get(
+    "/status/{job_id}", 
+    response_model=JobStatus,
+    summary="Get Job Status",
+    description="Retrieves the current status, progress, and metadata for a specific job.",
+    tags=["Jobs"],
+)
+async def get_job_status(job_id: str, job_manager: JobManager = Depends(get_job_manager)):
     """Get the status of a pipeline job."""
-    return job_manager.get_job_status(job_id)
+    job = job_manager.get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+    return JobStatus(
+        job_id=job.id, status=job.status, progress=job.progress, start_time=job.created_at,
+        end_time=job.updated_at, results=job.get_results()
+    )
 
 
-@app.get("/results/{job_id}", response_model=PipelineResults)
-async def get_job_results(job_id: str):
+@app.get(
+    "/results/{job_id}",
+    response_model=PipelineResults,
+    summary="Get Job Results",
+    description="""
+    Retrieves the full results of a completed job, including metrics, run context, 
+    and paths to all generated artifacts. Returns an error if the job is not yet completed.
+    """,
+    tags=["Jobs"],
+)
+async def get_job_results(job_id: str, job_manager: JobManager = Depends(get_job_manager)):
     """Get the results of a completed pipeline job."""
-    status = job_manager.get_job_status(job_id)
+    job = job_manager.get_job(job_id)
 
-    if status.status == 'pending':
+    if not job or job.status == 'pending':
         raise HTTPException(status_code=404, detail="Job not found or not yet submitted")
 
-    if status.status == 'running':
+    if job.status == 'running':
         raise HTTPException(status_code=202, detail="Job is still running")
 
-    if status.status == 'failed':
-        raise HTTPException(status_code=500, detail=f"Job failed: {status.error_message}")
+    if job.status == 'failed':
+        raise HTTPException(status_code=500, detail=f"Job failed")
 
-    if status.results is None:
+    results = job.get_results()
+    if results is None:
         raise HTTPException(status_code=404, detail="Results not available")
 
-    return status.results
+    return results
 
 
-@app.get("/download/{job_id}/{artifact_type}")
-async def download_artifact(job_id: str, artifact_type: str):
+@app.get(
+    "/download/{job_id}/{artifact_type}",
+    summary="Download a Job Artifact",
+    description="Downloads a specific data artifact (e.g., reads, calls, report) from a completed job.",
+    tags=["Artifacts"],
+)
+async def download_artifact(
+    job_id: str, 
+    artifact_type: str, 
+    job_manager: JobManager = Depends(get_job_manager)
+):
     """Download a specific artifact from a completed job."""
-    status = job_manager.get_job_status(job_id)
+    job = job_manager.get_job(job_id)
 
-    if status.status != 'completed' or status.results is None:
+    if not job or job.status != 'completed' or not job.results:
         raise HTTPException(status_code=404, detail="Artifact not available")
 
-    artifacts = status.results.get('artifacts', {})
+    results = job.get_results()
+    artifacts = results.get('artifacts', {}) if results else {}
     if artifact_type not in artifacts:
         raise HTTPException(status_code=404, detail=f"Artifact type '{artifact_type}' not found")
 
@@ -325,42 +215,41 @@ async def download_artifact(job_id: str, artifact_type: str):
     )
 
 
-@app.get("/jobs", response_model=JobListResponse)
-async def list_jobs(limit: int = Query(50, description="Maximum number of jobs to return")):
+@app.get(
+    "/jobs", 
+    response_model=JobListResponse,
+    summary="List Recent Jobs",
+    description="Retrieves a list of the most recent jobs, sorted by creation time.",
+    tags=["Jobs"],
+)
+async def list_jobs(
+    job_manager: JobManager = Depends(get_job_manager), 
+    limit: int = Query(50, description="The maximum number of jobs to return.")
+):
     """List recent jobs."""
-    job_manager.cleanup_old_jobs()
-
-    # Get recent jobs (most recent first)
-    recent_jobs = []
-    for job_id in sorted(job_manager.jobs.keys(), reverse=True):
-        job = job_manager.jobs[job_id]
-        recent_jobs.append({
-            'job_id': job['job_id'],
-            'status': job['status'],
-            'run_id': job['config_request'].get('run_id', 'unknown'),
-            'start_time': job['start_time'].isoformat() if job['start_time'] else None,
-            'end_time': job['end_time'].isoformat() if job['end_time'] else None
-        })
-
-        if len(recent_jobs) >= limit:
-            break
-
-    return {"jobs": recent_jobs}
+    jobs = job_manager.get_all_jobs(limit=limit)
+    job_statuses = [
+        JobStatus(
+            job_id=job.id, status=job.status, progress=job.progress, start_time=job.created_at,
+            end_time=job.updated_at
+        ) for job in jobs
+    ]
+    return {"jobs": job_statuses}
 
 
-def pipeline_background_task(job_id: str, config_request: PipelineConfigRequest):
-    """Wrapper to run the pipeline service in the background."""
-    service = PipelineService()
-    try:
-        service.run(job_id=job_id, config_request=config_request, job_manager=job_manager)
-    except DataProcessingError as e:
-        log.error("Background task failed with a data processing error", error=str(e))
-    except Exception as e:
-        log.error("An unexpected error occurred in background task", error=str(e))
-
-
-@app.post("/validate-config", response_model=ValidationResponse)
-async def validate_configuration(config_yaml: str = Form(...)):
+@app.post(
+    "/validate-config", 
+    response_model=ValidationResponse,
+    summary="Validate a Configuration",
+    description="""
+    Validates a given YAML configuration string without submitting a job. 
+    
+    This is useful for checking the correctness of a configuration and getting an estimate 
+    of the runtime before committing to a full pipeline run.
+    """,
+    tags=["Configuration"],
+)
+async def validate_configuration(config_yaml: str = Form(..., description="The YAML configuration string to validate.")):
     """Validate a pipeline configuration."""
     try:
         # Create temporary config file
@@ -383,7 +272,13 @@ async def validate_configuration(config_yaml: str = Form(...)):
         raise HTTPException(status_code=400, detail=f"Configuration validation failed: {str(e)}")
 
 
-@app.get("/config-templates", response_model=TemplateListResponse)
+@app.get(
+    "/config-templates", 
+    response_model=TemplateListResponse,
+    summary="Get Configuration Templates",
+    description="Retrieves a list of available pre-defined configuration templates (e.g., 'smoke_test', 'production').",
+    tags=["Configuration"],
+)
 async def get_config_templates():
     """Get available configuration templates."""
     from .config import PredefinedTemplates
@@ -396,11 +291,17 @@ async def get_config_templates():
     return {"templates": templates}
 
 
-@app.post("/config-from-template", response_model=ConfigFromTemplateResponse)
+@app.post(
+    "/config-from-template", 
+    response_model=ConfigFromTemplateResponse,
+    summary="Create Configuration from Template",
+    description="Generates a full YAML configuration string from a pre-defined template and a given run_id.",
+    tags=["Configuration"],
+)
 async def create_config_from_template(
-    template_name: str = Form(...),
-    run_id: str = Form(...),
-    seed: int = Form(7)
+    template_name: str = Form(..., description="The name of the template to use (e.g., 'smoke_test')."),
+    run_id: str = Form(..., description="The unique run identifier to embed in the configuration."),
+    seed: int = Form(7, description="The random seed to embed in the configuration.")
 ):
     """Create configuration from template."""
     from .config import PredefinedTemplates
