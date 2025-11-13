@@ -151,5 +151,9 @@ profile:
 .PHONY: mlflow-ui
 mlflow-ui:
 	@echo "Starting MLflow UI..."
-	@echo "Access it at http://127.0.0.1:5000"
+	@echo "Access it at http://1227.0.0.1:5000"
 	@$(UV) run mlflow ui
+
+.PHONY: help
+help:
+	@echo "Available commands:"
