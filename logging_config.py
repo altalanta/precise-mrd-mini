@@ -3,15 +3,18 @@
 import logging
 import sys
 import structlog
+from .settings import settings
 
-def setup_logging(log_level: str = "INFO"):
+def setup_logging(log_level: str = None):
     """Configure structured logging for the application."""
+    
+    # Use log level from settings if not explicitly provided
+    level = log_level or settings.LOG_LEVEL
 
-    # Configure standard logging to be captured by structlog
     logging.basicConfig(
         format="%(message)s",
         stream=sys.stdout,
-        level=log_level,
+        level=level.upper(),
     )
 
     # Configure structlog
@@ -33,6 +36,7 @@ def setup_logging(log_level: str = "INFO"):
 def get_logger(name: str) -> structlog.stdlib.BoundLogger:
     """Get a configured logger for a specific module."""
     return structlog.get_logger(name)
+
 
 
 

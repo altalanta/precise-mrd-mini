@@ -31,3 +31,4 @@ class ArtifactManager:
     """A simple manager to track artifacts and their hashes."""
 
 
+

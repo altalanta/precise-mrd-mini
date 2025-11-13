@@ -64,3 +64,4 @@ class PipelineResults(BaseModel):
     metrics: Dict[str, Any]
     artifacts: Dict[str, str]
     run_context: Dict[str, Any]
+

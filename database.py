@@ -6,9 +6,15 @@ from sqlalchemy.sql import func
 import json
 from typing import Dict, Any, Optional, List
 
-DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///./jobs.db")
+from .settings import settings
 
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+DATABASE_URL = settings.DATABASE_URL
+
+engine = create_engine(
+    DATABASE_URL, 
+    # The 'check_same_thread' argument is only needed for SQLite.
+    connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {}
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
@@ -43,3 +49,4 @@ def get_db():
         yield db
     finally:
         db.close()
+
