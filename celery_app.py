@@ -1,8 +1,9 @@
 
 import os
 from celery import Celery
+from .settings import settings
 
-REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+REDIS_URL = settings.REDIS_URL
 
 celery_app = Celery(
     "precise_mrd",
@@ -15,3 +16,4 @@ celery_app.conf.update(
     task_track_started=True,
     broker_connection_retry_on_startup=True,
 )
+

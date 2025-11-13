@@ -18,6 +18,9 @@ from .metrics import calculate_metrics
 from .reporting import render_report
 from .simulate import simulate_reads
 from .utils import PipelineIO, get_package_versions
+from .config import create_config_from_request
+from .exceptions import DataProcessingError
+from .mlops import setup_mlflow, log_pipeline_run
 
 if TYPE_CHECKING:
     from .api import JobManager, PipelineConfigRequest
@@ -39,29 +42,25 @@ class PipelineService:
         job_manager: "JobManager",
     ):
         """
-        Run the MRD pipeline for a job. This is the main business logic.
+        Executes the full MRD pipeline for a given configuration.
         """
+        # Bind job and run IDs to the logger for contextual logging
         job_log = log.bind(job_id=job_id, run_id=config_request.run_id, seed=config_request.seed)
+
         try:
             job_log.info("Starting pipeline job")
-            job_manager.update_job_status(job_id, 'running', 10.0)
 
-            if config_request.config_override:
-                with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
-                    f.write(config_request.config_override)
-                    config_path = f.name
-                config = load_config(config_path)
-                Path(config_path).unlink()
-            else:
-                config = PipelineConfig(
-                    run_id=config_request.run_id,
-                    seed=config_request.seed,
-                    simulation=None, umi=None, stats=None, lod=None,
-                )
+            # --- Setup MLflow ---
+            # Now reads configuration from settings
+            setup_mlflow()
 
-            job_manager.update_job_status(job_id, 'running', 20.0)
-            job_log.info("Configuration loaded", config_hash=config.config_hash())
+            # --- Configuration Setup ---
+            job_manager.update_job_status(job_id, 'running', progress=0.05)
+            config_path = f"configs/generated_config_{job_id}.yaml"
+            config = create_config_from_request(config_request, config_path)
+            job_log.info("Configuration created and validated.", config_path=config.config_file)
 
+            # Define output directories based on the run_id from the config
             job_dir = self.results_dir / job_id
             job_dir.mkdir(exist_ok=True)
             reports_dir = job_dir / "reports"
@@ -136,25 +135,36 @@ class PipelineService:
             ]]
             write_manifest(artifact_paths, out_manifest=str(manifest_path))
 
-            job_manager.update_job_status(job_id, 'completed', 100.0)
-            results = {
-                'job_id': job_id, 'run_id': config_request.run_id, 'config_hash': config.config_hash(),
-                'status': 'completed', 'metrics': metrics, 'run_context': run_context,
-                'artifacts': {
-                    'reads': str(reads_path), 'collapsed': str(collapsed_path), 'error_model': str(error_model_path),
-                    'calls': str(calls_path), 'metrics': str(metrics_path), 'run_context': str(context_path),
-                    'report': str(report_path), 'manifest': str(manifest_path)
-                }
-            }
-            job_manager.set_job_results(job_id, results)
+            # --- Generate Final Report ---
+            job_manager.update_job_status(job_id, 'running', progress=0.90)
+            job_log.info("Generating final report.")
+            # The original code had render_report here, but it's now integrated into the run_context.
+            # The new_code had generate_report(run_dir) which is not defined.
+            # Assuming the intent was to call render_report with the existing variables.
+            render_report(calls_df, metrics, config.to_dict(), run_context, str(report_path))
+
+            # --- Log Experiment to MLflow ---
+            job_log.info("Logging experiment to MLflow.")
+            log_pipeline_run(
+                run_name=config.run_id,
+                params=config.dict(),
+                metrics_path=reports_dir / "metrics.json",
+                artifacts_dir=job_dir,
+                tags={"job_id": job_id, "source": "api"}
+            )
+
+            # --- Finalize Job ---
+            job_manager.update_job_status(
+                job_id, 
+                'completed', 
+                progress=1.0, 
+                results_path=str(job_dir)
+            )
             job_log.info("Pipeline job completed successfully.")
 
         except Exception as e:
             job_log.error("Pipeline job failed", error=str(e), exc_info=True)
             job_manager.update_job_status(job_id, 'failed', error=str(e))
-        except Exception as e:
-            job_log.error("An unexpected error occurred in the pipeline job", error=str(e), exc_info=True)
-            job_manager.update_job_status(job_id, 'failed', error="An unexpected server error occurred.")
-            # We wrap the original exception in a DataProcessingError to standardize
+            # Re-raise as a specific application exception
             raise DataProcessingError(f"Pipeline job {job_id} failed: {e}") from e
 

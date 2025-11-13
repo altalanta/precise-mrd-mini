@@ -61,3 +61,4 @@ class JobManager:
 
 def get_job_manager(db: Session = Depends(get_db)) -> JobManager:
     return JobManager(db)
+

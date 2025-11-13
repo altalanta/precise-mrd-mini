@@ -31,3 +31,4 @@ def run_pipeline_task(self, job_id: str, config_request_dict: dict):
     log.info(f"Celery task {self.request.id} for job_id: {job_id} completed.")
     job = job_manager.get_job(job_id)
     return job.get_results() if job else None
+
