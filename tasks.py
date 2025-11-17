@@ -32,3 +32,5 @@ def run_pipeline_task(self, job_id: str, config_request_dict: dict):
     job = job_manager.get_job(job_id)
     return job.get_results() if job else None
 
+
+
