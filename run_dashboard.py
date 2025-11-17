@@ -8,9 +8,11 @@ import time
 from pathlib import Path
 import yaml
 from typing import Dict, Any, List, Optional
+import streamlit.components.v1 as components
 
 # --- Configuration ---
 API_BASE_URL = "http://127.0.0.1:8000"
+WS_BASE_URL = "ws://127.0.0.1:8000"
 st.set_page_config(
     page_title="Precise MRD Dashboard",
     page_icon="🧬",
@@ -64,10 +66,62 @@ def submit_job(run_id: str, seed: int, use_parallel: bool, use_ml: bool, use_dl:
         response.raise_for_status()
         return response.json()
     except requests.RequestException as e:
-        st.error(f"Failed to submit job: {e.content.decode()}")
+        st.error(f"Failed to submit job: {e.response.text if e.response else e}")
         return None
 
 # --- UI Components ---
+
+def websocket_updater(job_id: str):
+    """Injects a JavaScript component to listen for WebSocket updates."""
+    
+    # We use a placeholder to inject the component and then update it.
+    # This is a bit of a hack to force Streamlit to re-render the component
+    # when the job_id changes.
+    st.session_state['ws_placeholder'] = st.empty()
+    
+    with st.session_state['ws_placeholder']:
+        components.html(f"""
+            <div id="status-container" style="display: none;"></div>
+            <script>
+                const jobId = "{job_id}";
+                const wsUrl = `{WS_BASE_URL}/ws/status/${jobId}`;
+                let socket = new WebSocket(wsUrl);
+
+                socket.onopen = function(e) {{
+                    console.log("[open] Connection established for job " + jobId);
+                }};
+
+                socket.onmessage = function(event) {{
+                    console.log(`[message] Data received from server: ${{event.data}}`);
+                    const data = JSON.parse(event.data);
+                    
+                    // Trigger a re-run in Streamlit by setting a query param.
+                    // This is a workaround to update the Python-side state.
+                    const currentUrl = new URL(window.location.href);
+                    if (currentUrl.searchParams.get("job_id") !== data.job_id ||
+                        currentUrl.searchParams.get("status") !== data.status ||
+                        currentUrl.searchParams.get("progress") !== data.progress) {{
+                        
+                        currentUrl.searchParams.set("job_id", data.job_id);
+                        currentUrl.searchParams.set("status", data.status);
+                        currentUrl.searchParams.set("progress", data.progress.toFixed(2));
+                        window.location.href = currentUrl.href;
+                    }}
+                }};
+
+                socket.onclose = function(event) {{
+                    if (event.wasClean) {{
+                        console.log(`[close] Connection closed cleanly, code=${{event.code}} reason=${{event.reason}}`);
+                    }} else {{
+                        console.log('[close] Connection died');
+                    }}
+                }};
+
+                socket.onerror = function(error) {{
+                    console.log(`[error] ${{error.message}}`);
+                }};
+            </script>
+        """, height=0)
 
 def render_sidebar():
     """Render the sidebar for job submission."""
@@ -107,9 +161,10 @@ def render_job_list():
         return
 
     df = pd.DataFrame(jobs_data)
+    df['run_id'] = df.apply(lambda row: row.get('run_id') or f"Job_{row['job_id']}", axis=1)
     df = df[['job_id', 'status', 'progress', 'run_id', 'created_at']]
     df['created_at'] = pd.to_datetime(df['created_at']).dt.strftime('%Y-%m-%d %H:%M:%S')
-    df = df.sort_values('created_at', ascending=False)
+    df = df.sort_values('created_at', ascending=False).reset_index(drop=True)
     
     st.dataframe(df, use_container_width=True, hide_index=True)
 
@@ -132,6 +187,10 @@ def render_job_details():
         return
 
     st.header(f"Details for Job: `{job_id}`")
+    
+    # --- Real-time updater ---
+    websocket_updater(job_id)
+
     status_data = get_job_status(job_id)
 
     if not status_data:
@@ -141,50 +200,29 @@ def render_job_details():
     # --- Status & Metrics ---
     col1, col2, col3 = st.columns(3)
     col1.metric("Status", status_data['status'].upper())
-    col2.metric("Progress", f"{status_data['progress']:.1%}")
-    if status_data['start_time']:
+    progress_float = float(status_data.get('progress', 0.0))
+    col2.metric("Progress", f"{progress_float:.1%}")
+    if status_data.get('start_time'):
         start = pd.to_datetime(status_data['start_time'])
-        end = pd.to_datetime(status_data['end_time']) if status_data['end_time'] else pd.Timestamp.now(tz='UTC')
+        end = pd.to_datetime(status_data.get('end_time')) if status_data.get('end_time') else pd.Timestamp.now(tz='UTC')
         duration = end - start
         col3.metric("Duration", f"{duration.seconds}s")
 
     # --- Progress Bar ---
-    st.progress(status_data['progress'], text=f"Job is {status_data['status']}...")
+    st.progress(progress_float, text=f"Job is {status_data['status']}...")
 
     # --- Results ---
-    if status_data['status'] == 'completed' and status_data['results']:
+    if status_data['status'] == 'completed' and 'results' in status_data and status_data['results']:
         st.subheader("✅ Results")
         results = status_data['results']
+        st.json(results)
         
-        # Display key metrics
-        if 'metrics' in results:
-            st.write("**Key Metrics:**")
-            metrics = results['metrics']['overall']
-            m_col1, m_col2, m_col3, m_col4 = st.columns(4)
-            m_col1.metric("Precision", f"{metrics.get('precision', 0):.4f}")
-            m_col2.metric("Recall", f"{metrics.get('recall', 0):.4f}")
-            m_col3.metric("F1-Score", f"{metrics.get('f1_score', 0):.4f}")
-            m_col4.metric("Specificity", f"{metrics.get('specificity', 0):.4f}")
-
-        # Display run context
-        if 'run_context' in results:
-            with st.expander("Run Context & Configuration"):
-                st.json(results['run_context'])
-
-        # Display artifacts and download links
-        if 'artifacts' in results:
-            st.write("**Artifacts:**")
-            artifacts_df = pd.DataFrame.from_dict(results['artifacts'], orient='index', columns=['Path'])
-            artifacts_df['Download'] = artifacts_df.index.map(
-                lambda x: f"[Link]({API_BASE_URL}/download/{job_id}/{x})"
-            )
-            st.dataframe(artifacts_df, use_container_width=True)
-
-    elif status_data['status'] == 'failed':
-        st.error(f"Job failed: {status_data['error']}")
+    elif status_data['status'] == 'failed' and 'results' in status_data and status_data['results']:
+        st.error(f"Job failed:")
+        st.json(status_data['results'])
     
-    else:
-        st.info("Job is still running. Results will be displayed here upon completion.")
+    elif status_data['status'] not in ['completed', 'failed']:
+        st.info("Job is running. Status will update in real-time. Results will be shown upon completion.")
         
 # --- Main Application ---
 
@@ -209,9 +247,9 @@ def main():
     with col2:
         render_job_details()
 
-    # Auto-refresh the page periodically
-    time.sleep(5)
-    st.rerun()
+    # The auto-refresh polling is now replaced by WebSockets
+    # time.sleep(5)
+    # st.rerun()
 
 if __name__ == "__main__":
     main()

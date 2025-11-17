@@ -150,3 +150,23 @@ celery = "^5.4.0"
 redis = "^5.0.7"
 requests = "^2.32.3"
 pydantic-settings = "^2.4.0"
+
+[tool.pytest.ini_options]
+# Add command-line options for pytest
+addopts = "-ra -q"
+# Specify the directory for test discovery
+testpaths = [
+    "tests",
+]
+# Configure coverage analysis
+[tool.coverage.run]
+source = ["src/precise_mrd"]
+omit = [
+    "src/precise_mrd/models/*",
+    "src/precise_mrd/cli.py",
+    "src/precise_mrd/api.py"
+]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true
