@@ -70,12 +70,12 @@ class PipelineService:
 
             rng = set_global_seed(config_request.seed, deterministic_ops=True)
 
-            job_manager.update_job_status(job_id, 'running', 30.0)
+            job_manager.update_job_status(job_id, 'running', progress=0.30)
             job_log.info("Starting stage: simulate_reads")
             reads_path = data_dir / "simulated_reads.parquet"
             reads_df = simulate_reads(config, rng, output_path=str(reads_path))
 
-            job_manager.update_job_status(job_id, 'running', 50.0)
+            job_manager.update_job_status(job_id, 'running', progress=0.50)
             job_log.info("Finished stage: simulate_reads. Starting stage: collapse_umis")
             collapsed_path = data_dir / "collapsed_umis.parquet"
             collapsed_df = collapse_umis(
@@ -84,7 +84,7 @@ class PipelineService:
                 use_parallel=config_request.use_parallel
             )
 
-            job_manager.update_job_status(job_id, 'running', 70.0)
+            job_manager.update_job_status(job_id, 'running', progress=0.70)
             job_log.info("Finished stage: collapse_umis. Starting stage: fit_error_model")
             error_model_path = data_dir / "error_model.parquet"
             error_model_df = fit_error_model(
@@ -92,7 +92,7 @@ class PipelineService:
                 output_path=str(error_model_path)
             )
 
-            job_manager.update_job_status(job_id, 'running', 80.0)
+            job_manager.update_job_status(job_id, 'running', progress=0.80)
             job_log.info("Finished stage: fit_error_model. Starting stage: call_mrd")
             calls_path = data_dir / "mrd_calls.parquet"
             calls_df = call_mrd(
@@ -104,7 +104,7 @@ class PipelineService:
                 dl_model_type=config_request.dl_model_type
             )
 
-            job_manager.update_job_status(job_id, 'running', 90.0)
+            job_manager.update_job_status(job_id, 'running', progress=0.90)
             job_log.info("Finished stage: call_mrd. Starting final reporting stage.")
             metrics = calculate_metrics(calls_df, rng)
             run_context = {
@@ -135,14 +135,6 @@ class PipelineService:
             ]]
             write_manifest(artifact_paths, out_manifest=str(manifest_path))
 
-            # --- Generate Final Report ---
-            job_manager.update_job_status(job_id, 'running', progress=0.90)
-            job_log.info("Generating final report.")
-            # The original code had render_report here, but it's now integrated into the run_context.
-            # The new_code had generate_report(run_dir) which is not defined.
-            # Assuming the intent was to call render_report with the existing variables.
-            render_report(calls_df, metrics, config.to_dict(), run_context, str(report_path))
-
             # --- Log Experiment to MLflow ---
             job_log.info("Logging experiment to MLflow.")
             log_pipeline_run(
@@ -154,17 +146,17 @@ class PipelineService:
             )
 
             # --- Finalize Job ---
+            job_manager.set_job_results(job_id, str(job_dir))
             job_manager.update_job_status(
                 job_id, 
                 'completed', 
-                progress=1.0, 
-                results_path=str(job_dir)
+                progress=1.0,
             )
             job_log.info("Pipeline job completed successfully.")
 
         except Exception as e:
             job_log.error("Pipeline job failed", error=str(e), exc_info=True)
-            job_manager.update_job_status(job_id, 'failed', error=str(e))
+            job_manager.update_job_status(job_id, 'failed', progress=job_manager.get_job(job_id).progress, error=str(e))
             # Re-raise as a specific application exception
             raise DataProcessingError(f"Pipeline job {job_id} failed: {e}") from e
 
