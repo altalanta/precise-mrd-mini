@@ -1,18 +1,23 @@
 
 import uuid
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, TYPE_CHECKING
 from sqlalchemy.orm import Session
 from fastapi import Depends
 
 from .database import get_db, Job
 from .schemas import PipelineConfigRequest
 
+# This type hint helps with auto-completion, but we avoid a circular import
+if TYPE_CHECKING:
+    from .api import ConnectionManager
+
 
 class JobManager:
     """Manages asynchronous pipeline jobs using a persistent database."""
 
-    def __init__(self, db: Session):
+    def __init__(self, db: Session, ws_manager: "ConnectionManager" = None):
         self.db = db
+        self.ws_manager = ws_manager
 
     def create_job(self, config_request: PipelineConfigRequest) -> Job:
         """Create a new pipeline job in the database."""
@@ -33,7 +38,7 @@ class JobManager:
         return self.db.query(Job).filter(Job.id == job_id).first()
 
     def update_job_status(self, job_id: str, status: str, progress: float = None, error: str = None):
-        """Update job status and progress."""
+        """Update job status and progress, and broadcast the update."""
         job = self.get_job(job_id)
         if not job:
             raise ValueError(f"Job {job_id} not found")
@@ -44,14 +49,35 @@ class JobManager:
 
         if error:
             job.status = 'failed'
+            job.set_results({"error": error})
 
         self.db.commit()
 
-    def set_job_results(self, job_id: str, results: Dict[str, Any]):
-        """Set job results."""
+        # Broadcast the update via WebSocket
+        if self.ws_manager:
+            from .schemas import JobStatus
+            import asyncio
+            
+            job_status = JobStatus(
+                job_id=job.id, status=job.status, progress=job.progress, 
+                start_time=job.created_at, end_time=job.updated_at, 
+                results=job.get_results()
+            )
+            
+            # Run the async broadcast function in the background
+            asyncio.create_task(self.ws_manager.broadcast(job_id, job_status.dict()))
+
+    def set_job_results(self, job_id: str, results_path: str):
+        """Set job results from a directory path."""
         job = self.get_job(job_id)
         if job:
-            job.set_results(results)
+            # Create a serializable summary of results
+            results_summary = {
+                "results_path": results_path,
+                "report_url": f"/download/{job_id}/report",
+                "metrics_url": f"/download/{job_id}/metrics"
+            }
+            job.set_results(results_summary)
             self.db.commit()
 
     def get_all_jobs(self, skip: int = 0, limit: int = 100) -> List[Job]:
@@ -60,5 +86,10 @@ class JobManager:
 
 
 def get_job_manager(db: Session = Depends(get_db)) -> JobManager:
-    return JobManager(db)
+    # The websocket manager is injected here from the global scope of the api module.
+    # This is a simple approach for dependency injection without complex frameworks.
+    from .api import manager
+    return JobManager(db, manager)
+
+
 
