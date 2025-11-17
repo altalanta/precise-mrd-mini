@@ -687,3 +687,21 @@ class ModelValidator:
             'well_calibrated_threshold': 0.05,  # ECE < 5% considered well-calibrated
             'is_well_calibrated': ece < 0.05
         }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
