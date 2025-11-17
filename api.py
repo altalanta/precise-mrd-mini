@@ -11,7 +11,7 @@ from typing import Dict, List, Optional, Any
 from datetime import datetime
 import shutil
 
-from fastapi import FastAPI, HTTPException, File, UploadFile, Form, Query, Depends
+from fastapi import FastAPI, HTTPException, File, UploadFile, Form, Query, Depends, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
@@ -32,6 +32,38 @@ from .job_manager import JobManager, get_job_manager
 from .tasks import run_pipeline_task
 
 log = get_logger(__name__)
+
+
+class ConnectionManager:
+    """Manages active WebSocket connections for real-time updates."""
+
+    def __init__(self):
+        self.active_connections: Dict[str, List[WebSocket]] = {}
+
+    async def connect(self, websocket: WebSocket, job_id: str):
+        """Accepts a new WebSocket connection and associates it with a job_id."""
+        await websocket.accept()
+        if job_id not in self.active_connections:
+            self.active_connections[job_id] = []
+        self.active_connections[job_id].append(websocket)
+        log.info(f"WebSocket connected for job_id: {job_id}")
+
+    def disconnect(self, websocket: WebSocket, job_id: str):
+        """Disconnects a WebSocket and removes it from the active connections."""
+        if job_id in self.active_connections:
+            self.active_connections[job_id].remove(websocket)
+            if not self.active_connections[job_id]:
+                del self.active_connections[job_id]
+        log.info(f"WebSocket disconnected for job_id: {job_id}")
+
+    async def broadcast(self, job_id: str, message: Dict[str, Any]):
+        """Broadcasts a message to all clients connected for a specific job_id."""
+        if job_id in self.active_connections:
+            for connection in self.active_connections[job_id]:
+                await connection.send_json(message)
+
+# Create a single instance of the connection manager to be used across the application
+manager = ConnectionManager()
 
 
 # FastAPI application
@@ -80,6 +112,20 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.websocket("/ws/status/{job_id}", name="job_status_ws")
+async def websocket_endpoint(websocket: WebSocket, job_id: str):
+    """
+    WebSocket endpoint to stream real-time status updates for a given job.
+    """
+    await manager.connect(websocket, job_id)
+    try:
+        # Keep the connection alive
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        manager.disconnect(websocket, job_id)
 
 
 @app.post(
