@@ -9,7 +9,7 @@ import pandas as pd
 
 from ..ml_models import EnsembleVariantCaller, GradientBoostedVariantCaller
 from .base import VariantCaller
-from ..mlops import setup_mlflow, log_experiment
+from ..mlops import setup_mlflow
 import mlflow.sklearn
 
 if TYPE_CHECKING:
@@ -22,6 +22,7 @@ class MLVariantCaller(VariantCaller):
     def __init__(self, config: "PipelineConfig", ml_model_type: str = 'ensemble'):
         super().__init__(config)
         self.ml_model_type = ml_model_type
+        self.model_name = f"precise_mrd_{self.ml_model_type}"
         if self.ml_model_type == 'ensemble':
             self.model = EnsembleVariantCaller(config)
         else:
@@ -29,12 +30,14 @@ class MLVariantCaller(VariantCaller):
         self.training_results: Dict[str, Any] = {}
 
     def train(self, collapsed_df: pd.DataFrame, rng: np.random.Generator) -> Dict[str, Any]:
-        """Train the ML model and log the experiment to MLflow."""
+        """Train the ML model and register it with MLflow."""
         setup_mlflow()
         
         with mlflow.start_run() as run:
+            # Log parameters and data version tag
             mlflow.log_param("ml_model_type", self.ml_model_type)
             mlflow.log_param("seed", self.config.seed)
+            mlflow.set_tag("dvc_config_hash", self.config.config_hash())
 
             if self.ml_model_type == 'ensemble':
                 self.training_results = self.model.train_ensemble(collapsed_df, rng)
@@ -48,12 +51,18 @@ class MLVariantCaller(VariantCaller):
             }
             mlflow.log_metrics(metrics_to_log)
 
-            # Log the trained model
+            # Log and register the model
             if self.model.models:
-                 # For ensemble, we log the first model as an example
-                mlflow.sklearn.log_model(self.model.models[0], f"model_{self.ml_model_type}")
+                # For ensemble, we log the first model as an example
+                model_to_log = self.model.models[0]
+                mlflow.sklearn.log_model(
+                    sk_model=model_to_log,
+                    artifact_path="model",
+                    registered_model_name=self.model_name,
+                )
             
             self.training_results['mlflow_run_id'] = run.info.run_id
+            self.training_results['registered_model_name'] = self.model_name
             return self.training_results
 
     def predict(self, collapsed_df: pd.DataFrame, error_model_df: pd.DataFrame = None) -> pd.DataFrame:

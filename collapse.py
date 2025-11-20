@@ -21,7 +21,6 @@ except ImportError:
 
 
 @pa.check_input(pa.DataFrameSchema(SimulatedReadsSchema.to_schema().columns,
-                                 filter_ignore_na=True,
                                  strict=False))
 @pa.check_output(CollapsedUmisSchema)
 def collapse_umis(
