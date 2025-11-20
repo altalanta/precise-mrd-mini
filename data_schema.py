@@ -65,3 +65,4 @@ SimulatedReadsDF = DataFrame[SimulatedReadsSchema]
 CollapsedUMIsDF = DataFrame[CollapsedUMIsSchema]
 ErrorModelDF = DataFrame[ErrorModelSchema]
 MRDCallsDF = DataFrame[MRDCallsSchema]
+
