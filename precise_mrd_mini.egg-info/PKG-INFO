@@ -30,12 +30,10 @@ Description-Content-Type: text/markdown
 License-File: LICENSE
 Requires-Dist: numpy==1.26.4
 Requires-Dist: pandas==2.2.2
-Requires-Dist: scipy==1.13.1
 Requires-Dist: scikit-learn==1.5.2
 Requires-Dist: pyyaml==6.0.2
 Requires-Dist: click==8.1.7
 Requires-Dist: jsonschema==4.23.0
-Requires-Dist: pandera[io]==0.19.3
 Requires-Dist: dask[dataframe]==2024.8.2
 Requires-Dist: distributed==2024.8.2
 Requires-Dist: matplotlib==3.9.2
@@ -58,6 +56,18 @@ Requires-Dist: plotly==5.24.1
 Requires-Dist: streamlit-plotly-events==0.0.6
 Requires-Dist: sqlalchemy>=2.0.44
 Requires-Dist: celery[redis]>=5.6.0rc1
+Requires-Dist: scikit-learn>=1.5.1
+Requires-Dist: scipy>=1.14.0
+Requires-Dist: pandera>=0.20.0
+Requires-Dist: opentelemetry-sdk>=1.25.0
+Requires-Dist: opentelemetry-api>=1.25.0
+Requires-Dist: opentelemetry-instrumentation-fastapi>=0.46b0
+Requires-Dist: opentelemetry-instrumentation-celery>=0.46b0
+Requires-Dist: opentelemetry-exporter-otlp-proto-http>=1.25.0
+Requires-Dist: opentelemetry-exporter-otlp-proto-grpc>=1.25.0
+Requires-Dist: alembic>=1.13.1
+Requires-Dist: mlflow>=2.15.0
+Requires-Dist: structlog>=24.3.0
 Provides-Extra: dev
 Requires-Dist: pytest==8.3.3; extra == "dev"
 Requires-Dist: pytest-cov==5.0.0; extra == "dev"
@@ -71,9 +81,11 @@ Requires-Dist: dvc[s3]==3.50.0; extra == "dev"
 Requires-Dist: papermill==2.5.0; extra == "dev"
 Requires-Dist: ipykernel==6.29.5; extra == "dev"
 Requires-Dist: pre-commit==3.7.1; extra == "dev"
-Requires-Dist: structlog==24.3.0; extra == "dev"
 Requires-Dist: snakeviz==2.2.0; extra == "dev"
-Requires-Dist: mlflow==2.15.0; extra == "dev"
+Requires-Dist: celery>=5.4.0; extra == "dev"
+Requires-Dist: redis>=5.0.7; extra == "dev"
+Requires-Dist: requests>=2.32.3; extra == "dev"
+Requires-Dist: pydantic-settings>=2.4.0; extra == "dev"
 Provides-Extra: docs
 Requires-Dist: mkdocs-material>=9.0.0; extra == "docs"
 Requires-Dist: mkdocs-gen-files>=0.5.0; extra == "docs"
