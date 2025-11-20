@@ -53,7 +53,6 @@ def _save_cached_error_model(error_df: pd.DataFrame, cache_key: str, cache_dir: 
 
 
 @pa.check_input(pa.DataFrameSchema(CollapsedUmisSchema.to_schema().columns,
-                                 filter_ignore_na=True,
                                  strict=False))
 @pa.check_output(ErrorModelSchema)
 def fit_error_model(

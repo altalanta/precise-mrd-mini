@@ -7,7 +7,7 @@ __version__ = "0.1.0"
 # Core simulation and calling functionality
 from .simulate import simulate_reads
 from .collapse import collapse_umis
-from .call import call_mrd
+from .call import train_model, predict_from_model
 from .error_model import fit_error_model
 from .fastq import process_fastq_to_dataframe, detect_umi_format
 
@@ -30,7 +30,8 @@ __all__ = [
     # Core pipeline
     "simulate_reads",
     "collapse_umis",
-    "call_mrd",
+    "train_model",
+    "predict_from_model",
     "fit_error_model",
     "process_fastq_to_dataframe",
     "detect_umi_format",
