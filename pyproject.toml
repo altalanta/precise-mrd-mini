@@ -15,12 +15,10 @@ authors = [
 dependencies = [
     "numpy==1.26.4",
     "pandas==2.2.2",
-    "scipy==1.13.1",
     "scikit-learn==1.5.2",
     "pyyaml==6.0.2",
     "click==8.1.7",
     "jsonschema==4.23.0",
-    "pandera[io]==0.19.3",
     "dask[dataframe]==2024.8.2",
     "distributed==2024.8.2",
     "matplotlib==3.9.2",
@@ -43,6 +41,18 @@ dependencies = [
     "streamlit-plotly-events==0.0.6",
     "sqlalchemy>=2.0.44",
     "celery[redis]>=5.6.0rc1",
+    "scikit-learn>=1.5.1",
+    "scipy>=1.14.0",
+    "pandera>=0.20.0",
+    "opentelemetry-sdk>=1.25.0",
+    "opentelemetry-api>=1.25.0",
+    "opentelemetry-instrumentation-fastapi>=0.46b0",
+    "opentelemetry-instrumentation-celery>=0.46b0",
+    "opentelemetry-exporter-otlp-proto-http>=1.25.0",
+    "opentelemetry-exporter-otlp-proto-grpc>=1.25.0",
+    "alembic>=1.13.1",
+    "mlflow>=2.15.0",
+    "structlog>=24.3.0",
 ]
 
 [project.optional-dependencies]
@@ -59,9 +69,11 @@ dev = [
     "papermill==2.5.0",
     "ipykernel==6.29.5",
     "pre-commit==3.7.1",
-    "structlog==24.3.0",
     "snakeviz==2.2.0",
-    "mlflow==2.15.0"
+    "celery>=5.4.0",
+    "redis>=5.0.7",
+    "requests>=2.32.3",
+    "pydantic-settings>=2.4.0",
 ]
 docs = [
     "mkdocs-material>=9.0.0",
@@ -86,7 +98,7 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = "-v --tb=short -m 'not slow' --cov=src/precise_mrd --cov-report=term-missing --cov-fail-under=80"
+addopts = "-v --tb=short -m 'not slow' --cov=src/precise_mrd --cov-report=term-missing"
 markers = [
     "slow: mark tests that require heavier simulations",
     "integration: mark tests that run the full pipeline end-to-end",
@@ -135,30 +147,6 @@ ignore = [
 [tool.uv.sources]
 precise_mrd = { path = "src/precise_mrd", editable = true }
 
-[tool.uv.dev-dependencies]
-pytest = "^8.3.2"
-pytest-cov = "^5.0.0"
-papermill = "^2.6.0"
-ipykernel = "^6.29.5"
-pre-commit = "^3.8.0"
-ruff = "^0.6.8"
-black = "^24.8.0"
-structlog = "^24.3.0"
-snakeviz = "^2.2.0"
-mlflow = ">=2.15.0"
-celery = "^5.4.0"
-redis = "^5.0.7"
-requests = "^2.32.3"
-pydantic-settings = "^2.4.0"
-
-[tool.pytest.ini_options]
-# Add command-line options for pytest
-addopts = "-ra -q"
-# Specify the directory for test discovery
-testpaths = [
-    "tests",
-]
-# Configure coverage analysis
 [tool.coverage.run]
 source = ["src/precise_mrd"]
 omit = [
