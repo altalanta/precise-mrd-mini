@@ -66,4 +66,18 @@ class PipelineResults(BaseModel):
     run_context: Dict[str, Any]
 
 
+class ServiceStatus(BaseModel):
+    """Health status of a single downstream service."""
+    name: str = Field(..., description="Name of the service (e.g., 'database', 'redis').")
+    status: str = Field(..., description="Service status ('ok' or 'error').")
+    message: Optional[str] = Field(None, description="Additional details about the service status.")
+
+
+class HealthStatus(BaseModel):
+    """Overall health status of the API."""
+    status: str = Field(..., description="Overall status ('ok' or 'error').")
+    services: List[ServiceStatus] = Field(..., description="Status of individual downstream services.")
+
+
+
 

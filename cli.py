@@ -32,6 +32,8 @@ from .cache import PipelineCache
 from .config import ConfigValidator, PredefinedTemplates, PipelineConfig, ConfigVersionManager, dump_config
 from .api import create_api_app, run_api_server
 from .logging_config import setup_logging, get_logger
+from .call import train_model, predict_from_model
+import pandas as pd
 
 DEFAULT_CONFIG_NAME = "smoke.yaml"
 REPORTS_DIR = Path("reports")
@@ -130,17 +132,19 @@ def _run_smoke_pipeline(config: PipelineConfig, seed: int, output_dir: Path, use
         output_path=str(error_model_path),
         use_advanced_stats=False,
     )
-    calls_df = call_mrd(
-        collapsed_df,
-        error_model_df,
-        config,
-        rng,
-        output_path=str(calls_path),
-        use_ml_calling=use_ml_calling,
-        ml_model_type=ml_model_type,
-        use_deep_learning=use_deep_learning,
-        dl_model_type=dl_model_type,
+    # The call to `call_mrd` is now deprecated in favor of explicit train/predict steps
+    # For backward compatibility of this function, we'll use a basic statistical call.
+    click.echo(
+        click.style(
+            "Warning: _run_smoke_pipeline's direct calling is deprecated. "
+            "Use 'eval train' and 'eval predict' commands for ML models.",
+            fg="yellow",
+        )
     )
+    from .models.statistical import StatisticalVariantCaller
+    stat_caller = StatisticalVariantCaller(config)
+    calls_df = stat_caller.predict(collapsed_df, error_model_df)
+    calls_df.to_parquet(calls_path)
 
     metrics = calculate_metrics(
         calls_df,
@@ -418,6 +422,58 @@ def eval_lod_cmd(ctx: CLIContext, replicates: int) -> None:
             indent=2,
         )
     )
+
+
+@eval_group.command("train")
+@click.option("--data-in", required=True, type=click.Path(exists=True, path_type=Path), help="Path to collapsed UMIs parquet file for training.")
+@click.option("--model-type", type=click.Choice(['statistical', 'ml', 'dl']), default='ml', show_default=True, help="Type of model to train.")
+@click.option("--model-subtype", type=str, default='ensemble', show_default=True, help="Sub-type of the model (e.g., 'xgboost' for ml).")
+@click.pass_obj
+def eval_train_cmd(ctx: CLIContext, data_in: Path, model_type: str, model_subtype: str) -> None:
+    """Train a model and register it with MLflow."""
+    log = get_logger(__name__)
+    log.info(f"Starting model training for type: {model_type}/{model_subtype}")
+    config = _load_pipeline_config(ctx.config_override, ctx.seed)
+    rng = set_global_seed(ctx.seed, deterministic_ops=True)
+
+    collapsed_df = pd.read_parquet(data_in)
+
+    results = train_model(
+        collapsed_df=collapsed_df,
+        config=config,
+        rng=rng,
+        model_type=model_type,
+        model_subtype=model_subtype
+    )
+
+    log.info("Model training completed.", **results)
+    click.echo(json.dumps(results, indent=2))
+
+
+@eval_group.command("predict")
+@click.option("--data-in", required=True, type=click.Path(exists=True, path_type=Path), help="Path to collapsed UMIs parquet file for prediction.")
+@click.option("--error-model-in", required=True, type=click.Path(exists=True, path_type=Path), help="Path to a fitted error model parquet file.")
+@click.option("--model-uri", required=True, type=str, help="MLflow model URI (e.g., 'models:/my_model/1').")
+@click.option("--out", "output_path", required=True, type=click.Path(path_type=Path), help="Path to save the prediction results parquet file.")
+@click.pass_obj
+def eval_predict_cmd(ctx: CLIContext, data_in: Path, error_model_in: Path, model_uri: str, output_path: Path) -> None:
+    """Predict MRD status using a trained model from MLflow."""
+    log = get_logger(__name__)
+    log.info(f"Starting prediction with model: {model_uri}")
+    config = _load_pipeline_config(ctx.config_override, ctx.seed)
+
+    collapsed_df = pd.read_parquet(data_in)
+    error_model_df = pd.read_parquet(error_model_in)
+
+    results_df = predict_from_model(
+        collapsed_df=collapsed_df,
+        error_model_df=error_model_df,
+        config=config,
+        model_uri=model_uri,
+        output_path=output_path
+    )
+    log.info(f"Predictions saved to {output_path}", count=len(results_df))
+    click.echo(f"Predictions saved to {output_path}")
 
 
 @eval_group.command("loq")

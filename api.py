@@ -10,6 +10,8 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 import shutil
+import time
+from fastapi import Request
 
 from fastapi import FastAPI, HTTPException, File, UploadFile, Form, Query, Depends, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse, FileResponse
@@ -26,10 +28,13 @@ from .exceptions import ConfigurationError, DataProcessingError
 from .database import init_db, get_db, Job
 from .schemas import (
     PipelineConfigRequest, JobStatus, JobListResponse, ValidationResponse,
-    TemplateListResponse, ConfigFromTemplateResponse, PipelineResults
+    TemplateListResponse, ConfigFromTemplateResponse, PipelineResults,
+    HealthStatus, ServiceStatus
 )
 from .job_manager import JobManager, get_job_manager
 from .tasks import run_pipeline_task
+from .celery_app import celery_app
+from .tracing import setup_telemetry, instrument_fastapi_app
 
 log = get_logger(__name__)
 
@@ -98,10 +103,12 @@ Jobs are processed asynchronously by a distributed Celery task queue for scalabi
 
 @app.on_event("startup")
 async def startup_event():
-    """Configure logging on application startup."""
+    """Configure logging and telemetry on application startup."""
     setup_logging()
+    setup_telemetry()
+    instrument_fastapi_app(app)
     init_db()
-    log.info("Application startup complete. Logging configured.")
+    log.info("Application startup complete. Logging, Telemetry, and DB configured.")
 
 
 # CORS middleware for web integration
@@ -112,6 +119,71 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def structured_logging_middleware(request: Request, call_next):
+    """
+    Middleware to add structured logging for every API request.
+    """
+    start_time = time.time()
+    
+    response = await call_next(request)
+    
+    process_time = (time.time() - start_time) * 1000
+    
+    log.info(
+        "api_request",
+        method=request.method,
+        path=request.url.path,
+        query_params=str(request.query_params),
+        status_code=response.status_code,
+        processing_time_ms=f"{process_time:.2f}",
+        client_host=request.client.host,
+    )
+    
+    return response
+
+
+@app.get(
+    "/health",
+    response_model=HealthStatus,
+    summary="Get Service Health Status",
+    description="""
+    Performs a health check on the API and its downstream services, 
+    including the database and Redis cache.
+    """,
+    tags=["Health"],
+)
+def get_health_status(db: Session = Depends(get_db)):
+    """Check the health of the service and its dependencies."""
+    db_status = "ok"
+    db_message = "Database connection successful."
+    try:
+        # Perform a simple query to check DB connection
+        db.execute("SELECT 1")
+    except Exception as e:
+        db_status = "error"
+        db_message = f"Database connection failed: {e}"
+
+    redis_status = "ok"
+    redis_message = "Redis connection successful."
+    try:
+        # Perform a simple ping to check Redis connection
+        celery_app.backend.client.ping()
+    except Exception as e:
+        redis_status = "error"
+        redis_message = f"Redis connection failed: {e}"
+
+    overall_status = "ok" if db_status == "ok" and redis_status == "ok" else "error"
+    
+    return HealthStatus(
+        status=overall_status,
+        services=[
+            ServiceStatus(name="database", status=db_status, message=db_message),
+            ServiceStatus(name="redis", status=redis_status, message=redis_message),
+        ]
+    )
 
 
 @app.websocket("/ws/status/{job_id}", name="job_status_ws")
