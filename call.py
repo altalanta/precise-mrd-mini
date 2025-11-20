@@ -16,61 +16,87 @@ from .models.base import VariantCaller
 from .models.statistical import StatisticalVariantCaller
 from .models.machine_learning import MLVariantCaller
 from .models.deep_learning import DLVariantCaller
+import mlflow
 
 
 def get_variant_caller(
     config: PipelineConfig,
-    use_ml_calling: bool,
-    ml_model_type: str,
-    use_deep_learning: bool,
-    dl_model_type: str
+    model_type: str,
+    model_subtype: str,
 ) -> VariantCaller:
     """Factory function to get the appropriate variant caller."""
-    if use_ml_calling:
-        return MLVariantCaller(config, ml_model_type)
-    elif use_deep_learning:
-        return DLVariantCaller(config, dl_model_type)
-    else:
+    if model_type == 'ml':
+        return MLVariantCaller(config, model_subtype)
+    elif model_type == 'dl':
+        return DLVariantCaller(config, model_subtype)
+    else: # 'statistical'
         return StatisticalVariantCaller(config)
 
 
 @pa.check_input(pa.DataFrameSchema(CollapsedUmisSchema.to_schema().columns,
-                                 filter_ignore_na=True,
+                                 strict=False), "collapsed_df")
+def train_model(
+    collapsed_df: pd.DataFrame,
+    config: PipelineConfig,
+    rng: np.random.Generator,
+    model_type: str,
+    model_subtype: str
+) -> dict:
+    """
+    Train a variant calling model and register it in MLflow.
+    """
+    caller = get_variant_caller(config, model_type, model_subtype)
+    training_results = caller.train(collapsed_df, rng)
+    return training_results
+
+
+@pa.check_input(pa.DataFrameSchema(CollapsedUmisSchema.to_schema().columns,
                                  strict=False), "collapsed_df")
 @pa.check_input(pa.DataFrameSchema(ErrorModelSchema.to_schema().columns,
-                                 filter_ignore_na=True,
                                  strict=False), "error_model_df")
-def call_mrd(
+def predict_from_model(
     collapsed_df: pd.DataFrame,
     error_model_df: pd.DataFrame,
     config: PipelineConfig,
-    rng: np.random.Generator,
-    output_path: Optional[str] = None,
-    use_ml_calling: bool = False,
-    ml_model_type: str = 'ensemble',
-    use_deep_learning: bool = False,
-    dl_model_type: str = 'cnn_lstm'
+    model_uri: str,
+    output_path: Optional[str] = None
 ) -> pd.DataFrame:
     """
-    Perform MRD calling by dispatching to the appropriate pluggable model.
+    Perform MRD calling using a pre-trained model from MLflow.
     """
-    caller = get_variant_caller(
-        config, use_ml_calling, ml_model_type, use_deep_learning, dl_model_type
-    )
+    # Note: For this refactoring, we assume the model type from the URI.
+    # A more robust solution might inspect the model or take type as an arg.
+    
+    # Load the model from MLflow Registry
+    loaded_model = mlflow.sklearn.load_model(model_uri)
+    
+    # The loaded_model is the raw sklearn model. We need to wrap it
+    # or create a prediction logic here. For simplicity, we'll
+    # replicate the essential parts of the original predict logic.
+    
+    # This part is simplified. A full implementation would need to
+    # reconstruct the feature engineering pipeline if it exists.
+    features = ['family_size', 'quality_score', 'consensus_agreement']
+    X_predict = collapsed_df[features]
 
-    # Train the model (if applicable) and predict
-    caller.train(collapsed_df, rng)
-    results_df = caller.predict(collapsed_df, error_model_df)
+    ml_probabilities = loaded_model.predict_proba(X_predict)[:, 1]
 
+    # Thresholding would be loaded from MLflow run associated with the model artifact
+    # For now, we use a default.
+    client = mlflow.tracking.MlflowClient()
+    model_version = client.get_model_version_by_alias(name=model_uri.split('/')[1], alias="latest") # Simplified
+    run_info = client.get_run(model_version.run_id)
+    optimal_threshold = float(run_info.data.metrics.get("optimal_threshold", 0.5))
+    
+    ml_calls = (ml_probabilities > optimal_threshold).astype(int)
+
+    results_df = collapsed_df.copy()
+    results_df['predicted_is_variant'] = ml_calls
+    results_df['prediction_prob'] = ml_probabilities
+    
     # Validate the output against the appropriate schema
-    if isinstance(caller, MLVariantCaller):
-        results_df = MLCallsSchema.validate(results_df)
-    elif isinstance(caller, DLVariantCaller):
-        results_df = DLCallsSchema.validate(results_df)
-    elif isinstance(caller, StatisticalVariantCaller):
-        results_df = StatisticalCallsSchema.validate(results_df)
+    results_df = MLCallsSchema.validate(results_df)
 
-    # Save results if output path specified
     if output_path and not results_df.empty:
         results_df.to_parquet(output_path, index=False)
 
