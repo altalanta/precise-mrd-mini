@@ -6,10 +6,11 @@ src/precise_mrd/advanced_stats.py
 src/precise_mrd/api.py
 src/precise_mrd/cache.py
 src/precise_mrd/call.py
+src/precise_mrd/celery_app.py
 src/precise_mrd/cli.py
 src/precise_mrd/collapse.py
 src/precise_mrd/config.py
-src/precise_mrd/dashboard.py
+src/precise_mrd/data_schema.py
 src/precise_mrd/data_schemas.py
 src/precise_mrd/database.py
 src/precise_mrd/deep_learning_models.py
@@ -17,6 +18,7 @@ src/precise_mrd/determinism_utils.py
 src/precise_mrd/error_model.py
 src/precise_mrd/exceptions.py
 src/precise_mrd/fastq.py
+src/precise_mrd/job_manager.py
 src/precise_mrd/logging_config.py
 src/precise_mrd/metrics.py
 src/precise_mrd/ml_models.py
@@ -24,8 +26,12 @@ src/precise_mrd/mlops.py
 src/precise_mrd/performance.py
 src/precise_mrd/pipeline_service.py
 src/precise_mrd/reporting.py
+src/precise_mrd/schemas.py
+src/precise_mrd/settings.py
 src/precise_mrd/simulate.py
 src/precise_mrd/statistical_validation.py
+src/precise_mrd/tasks.py
+src/precise_mrd/tracing.py
 src/precise_mrd/utils.py
 src/precise_mrd/validation.py
 src/precise_mrd/assets/schemas/calibration.schema.json
