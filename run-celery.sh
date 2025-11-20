@@ -16,3 +16,4 @@ celery -A src.precise_mrd.celery_app.celery_app worker --loglevel=info -c 1
 
 
 
+
