@@ -4,8 +4,6 @@ import cProfile
 import pstats
 from pathlib import Path
 
-from precise_mrd.cli import main
-
 REPORTS_DIR = Path("reports")
 PROFILING_DIR = REPORTS_DIR / "profiling"
 
@@ -19,10 +17,7 @@ def run_profiler():
     # This is a clean way to profile a command-line application
     command = "smoke --no-cache"
     cProfile.runctx(
-        f"main('{command}'.split())",
-        globals(),
-        locals(),
-        str(profile_output)
+        f"main('{command}'.split())", globals(), locals(), str(profile_output)
     )
 
     print(f"Profiling data saved to: {profile_output}")
@@ -35,10 +30,3 @@ def run_profiler():
 
 if __name__ == "__main__":
     run_profiler()
-
-
-
-
-
-
-
