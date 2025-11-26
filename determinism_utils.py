@@ -1,6 +1,10 @@
-from typing import List, Dict, Any
 
-from .utils import PipelineIO
+from pathlib import Path
+
+import numpy as np
+import torch
+
+from .io import PipelineIO
 
 
 def set_global_seed(seed: int, deterministic_ops: bool = True) -> np.random.Generator:
@@ -17,21 +21,15 @@ def set_global_seed(seed: int, deterministic_ops: bool = True) -> np.random.Gene
     return rng
 
 
-def write_manifest(file_paths: List[str], out_manifest: str) -> None:
-    """Create a manifest file with SHA256 hashes of the given files."""
+def create_hash_manifest(file_paths: list[str]) -> dict[str, str]:
+    """Create a manifest of SHA256 hashes for a list of files."""
     manifest_data = {}
     for f_path in file_paths:
         f_name = Path(f_path).name
         manifest_data[f_name] = PipelineIO.calculate_sha256(f_path)
-    
-    PipelineIO.save_json(manifest_data, out_manifest)
+
+    return manifest_data
 
 
 class ArtifactManager:
     """A simple manager to track artifacts and their hashes."""
-
-
-
-
-
-

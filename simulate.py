@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-import pandas as pd
+from itertools import product
+
 import numpy as np
-from typing import Dict, Any, Optional
+import pandas as pd
 import pandera as pa
 
 from .config import PipelineConfig
@@ -13,9 +14,7 @@ from .data_schemas import SimulatedReadsSchema
 
 @pa.check_output(SimulatedReadsSchema)
 def simulate_reads(
-    config: PipelineConfig,
-    rng: np.random.Generator,
-    output_path: Optional[str] = None
+    config: PipelineConfig, rng: np.random.Generator, output_path: str | None = None
 ) -> pd.DataFrame:
     """Simulate synthetic UMI reads for ctDNA analysis.
 
@@ -33,9 +32,9 @@ def simulate_reads(
 
     # Handle case where simulation config might be a dict
     if isinstance(sim_config, dict):
-        allele_fractions = sim_config['allele_fractions']
-        umi_depths = sim_config['umi_depths']
-        n_replicates = sim_config['n_replicates']
+        allele_fractions = sim_config["allele_fractions"]
+        umi_depths = sim_config["umi_depths"]
+        n_replicates = sim_config["n_replicates"]
     else:
         allele_fractions = sim_config.allele_fractions
         umi_depths = sim_config.umi_depths
@@ -44,61 +43,63 @@ def simulate_reads(
     # Handle UMI config
     umi_config = config.umi
     if isinstance(umi_config, dict):
-        max_family_size = umi_config['max_family_size']
+        max_family_size = umi_config["max_family_size"]
     else:
         max_family_size = umi_config.max_family_size
 
     # Generate synthetic data based on configuration
-    n_variants = len(allele_fractions)
-    n_depths = len(umi_depths)
-    total_samples = n_variants * n_depths * n_replicates
 
     # Create grid of conditions
+    conditions = list(
+        product(range(len(allele_fractions)), range(len(umi_depths)), range(n_replicates))
+    )
+
     data = []
     sample_id = 0
 
-    for af in allele_fractions:
-        for depth in umi_depths:
-            for rep in range(n_replicates):
-                # Simulate UMI families
-                n_families = depth
+    for af_idx, depth_idx, rep_idx in conditions:
+        af = allele_fractions[af_idx]
+        depth = umi_depths[depth_idx]
+        rep = rep_idx
 
-                # Background error rate (trinucleotide context dependent)
-                background_rate = rng.uniform(1e-5, 1e-3)
+        # Simulate UMI families
+        n_families = depth
 
-                # Generate reads per family (Poisson distributed)
-                family_sizes = rng.poisson(lam=5, size=n_families)
-                family_sizes = np.clip(family_sizes, 1, max_family_size)
+        # Background error rate (trinucleotide context dependent)
+        background_rate = rng.uniform(1e-5, 1e-3)
 
-                # Simulate variant calls
-                # True positives based on allele fraction
-                n_true_variants = rng.binomial(n_families, af)
+        # Generate reads per family (Poisson distributed)
+        family_sizes = rng.poisson(lam=5, size=n_families)
+        family_sizes = np.clip(family_sizes, 1, max_family_size)
 
-                # False positives from background errors
-                n_false_positives = rng.binomial(
-                    n_families - n_true_variants,
-                    background_rate
-                )
+        # Simulate variant calls
+        # True positives based on allele fraction
+        n_true_variants = rng.binomial(n_families, af)
 
-                # Quality scores (higher for true variants)
-                quality_scores = rng.normal(25, 5, n_families)
-                quality_scores = np.clip(quality_scores, 10, 40)
+        # False positives from background errors
+        n_false_positives = rng.binomial(
+            n_families - n_true_variants, background_rate
+        )
 
-                sample_data = {
-                    'sample_id': sample_id,
-                    'allele_fraction': af,
-                    'target_depth': depth,
-                    'replicate': rep,
-                    'n_families': n_families,
-                    'n_true_variants': n_true_variants,
-                    'n_false_positives': n_false_positives,
-                    'background_rate': background_rate,
-                    'mean_family_size': np.mean(family_sizes),
-                    'mean_quality': np.mean(quality_scores),
-                    'config_hash': config.config_hash(),
-                }
-                data.append(sample_data)
-                sample_id += 1
+        # Quality scores (higher for true variants)
+        quality_scores = rng.normal(25, 5, n_families)
+        quality_scores = np.clip(quality_scores, 10, 40)
+
+        sample_data = {
+            "sample_id": sample_id,
+            "allele_fraction": af,
+            "target_depth": depth,
+            "replicate": rep,
+            "n_families": n_families,
+            "n_true_variants": n_true_variants,
+            "n_false_positives": n_false_positives,
+            "background_rate": background_rate,
+            "mean_family_size": np.mean(family_sizes),
+            "mean_quality": np.mean(quality_scores),
+            "config_hash": config.config_hash(),
+        }
+        data.append(sample_data)
+        sample_id += 1
 
     df = pd.DataFrame(data)
 

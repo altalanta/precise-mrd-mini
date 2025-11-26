@@ -5,12 +5,9 @@ from __future__ import annotations
 import hashlib
 import json
 import pickle
-from pathlib import Path
-from typing import Any, Dict, Optional, Union
 import time
-
-import pandas as pd
-import numpy as np
+from pathlib import Path
+from typing import Any
 
 from .config import PipelineConfig
 
@@ -18,7 +15,12 @@ from .config import PipelineConfig
 class PipelineCache:
     """Cache for pipeline intermediate results."""
 
-    def __init__(self, cache_dir: Union[str, Path], enabled: bool = True, ttl_seconds: int = 86400):
+    def __init__(
+        self,
+        cache_dir: str | Path,
+        enabled: bool = True,
+        ttl_seconds: int = 86400,
+    ):
         """Initialize cache.
 
         Args:
@@ -39,7 +41,7 @@ class PipelineCache:
         """Load cache metadata."""
         if self._metadata_file.exists():
             try:
-                with open(self._metadata_file, 'r') as f:
+                with open(self._metadata_file) as f:
                     self._metadata = json.load(f)
             except (json.JSONDecodeError, FileNotFoundError):
                 self._metadata = {}
@@ -49,12 +51,14 @@ class PipelineCache:
     def _save_metadata(self):
         """Save cache metadata."""
         if self.enabled:
-            with open(self._metadata_file, 'w') as f:
+            with open(self._metadata_file, "w") as f:
                 json.dump(self._metadata, f, indent=2)
 
     def _get_cache_key(self, func_name: str, args_hash: str, config_hash: str) -> str:
         """Generate cache key for a function call."""
-        return hashlib.sha256(f"{func_name}:{args_hash}:{config_hash}".encode()).hexdigest()[:16]
+        return hashlib.sha256(
+            f"{func_name}:{args_hash}:{config_hash}".encode()
+        ).hexdigest()[:16]
 
     def _get_config_hash(self, config: PipelineConfig) -> str:
         """Get hash of pipeline configuration."""
@@ -76,10 +80,16 @@ class PipelineCache:
             return True
 
         metadata = self._metadata[cache_key]
-        cache_time = metadata.get('timestamp', 0)
+        cache_time = metadata.get("timestamp", 0)
         return (time.time() - cache_time) > self.ttl_seconds
 
-    def get(self, func_name: str, config: PipelineConfig, args: tuple = (), kwargs: dict = None) -> Any:
+    def get(
+        self,
+        func_name: str,
+        config: PipelineConfig,
+        args: tuple = (),
+        kwargs: dict = None,
+    ) -> Any:
         """Get cached result if available and not expired.
 
         Args:
@@ -107,12 +117,19 @@ class PipelineCache:
             return None
 
         try:
-            with open(cache_file, 'rb') as f:
+            with open(cache_file, "rb") as f:
                 return pickle.load(f)
         except (pickle.PickleError, FileNotFoundError, EOFError):
             return None
 
-    def put(self, func_name: str, config: PipelineConfig, args: tuple = (), kwargs: dict = None, result: Any = None):
+    def put(
+        self,
+        func_name: str,
+        config: PipelineConfig,
+        args: tuple = (),
+        kwargs: dict = None,
+        result: Any = None,
+    ):
         """Store result in cache.
 
         Args:
@@ -132,16 +149,16 @@ class PipelineCache:
 
         # Update metadata
         self._metadata[cache_key] = {
-            'func_name': func_name,
-            'timestamp': time.time(),
-            'config_hash': config_hash,
-            'args_hash': args_hash
+            "func_name": func_name,
+            "timestamp": time.time(),
+            "config_hash": config_hash,
+            "args_hash": args_hash,
         }
 
         # Save result
         cache_file = self.cache_dir / f"{cache_key}.pkl"
         try:
-            with open(cache_file, 'wb') as f:
+            with open(cache_file, "wb") as f:
                 pickle.dump(result, f, protocol=pickle.HIGHEST_PROTOCOL)
         except (pickle.PickleError, OSError):
             # Remove from metadata if saving failed
@@ -172,7 +189,7 @@ class PipelineCache:
             return
 
         expired_keys = []
-        for cache_key, metadata in self._metadata.items():
+        for cache_key, _metadata in self._metadata.items():
             if self._is_expired(cache_key):
                 expired_keys.append(cache_key)
 
@@ -200,6 +217,7 @@ def cached_pipeline_step(cache: PipelineCache = None):
     Returns:
         Decorator function
     """
+
     def decorator(func):
         def wrapper(config: PipelineConfig, *args, **kwargs):
             if cache is None:
@@ -221,5 +239,7 @@ def cached_pipeline_step(cache: PipelineCache = None):
             cache.put(func_name, config, args, kwargs, result)
 
             return result
+
         return wrapper
+
     return decorator
