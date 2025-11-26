@@ -1,10 +1,7 @@
 """Test that legacy NumPy RNG API is not used."""
 
 import ast
-import importlib
-import sys
 from pathlib import Path
-from typing import Set
 
 import pytest
 
@@ -13,7 +10,7 @@ class LegacyRNGVisitor(ast.NodeVisitor):
     """AST visitor to detect legacy NumPy random API usage."""
 
     def __init__(self):
-        self.legacy_calls: Set[str] = set()
+        self.legacy_calls: set[str] = set()
         self.import_aliases = {}  # Track np aliases
 
     def visit_Import(self, node):
@@ -35,31 +32,53 @@ class LegacyRNGVisitor(ast.NodeVisitor):
         """Check for np.random.seed(), np.random.rand(), etc."""
         if isinstance(node.value, ast.Attribute):
             # np.random.seed case
-            if (isinstance(node.value.value, ast.Name) and
-                node.value.value.id in self.import_aliases and
-                self.import_aliases[node.value.value.id] == "numpy" and
-                node.value.attr == "random"):
-
-                if node.attr in ["seed", "rand", "randn", "randint", "shuffle",
-                               "choice", "uniform", "normal", "binomial", "poisson"]:
+            if (
+                isinstance(node.value.value, ast.Name)
+                and node.value.value.id in self.import_aliases
+                and self.import_aliases[node.value.value.id] == "numpy"
+                and node.value.attr == "random"
+            ):
+                if node.attr in [
+                    "seed",
+                    "rand",
+                    "randn",
+                    "randint",
+                    "shuffle",
+                    "choice",
+                    "uniform",
+                    "normal",
+                    "binomial",
+                    "poisson",
+                ]:
                     self.legacy_calls.add(f"numpy.random.{node.attr}")
 
         elif isinstance(node.value, ast.Name):
             # Direct random.seed if imported as 'from numpy import random'
-            if (node.value.id in self.import_aliases and
-                self.import_aliases[node.value.id] == "numpy.random"):
-
-                if node.attr in ["seed", "rand", "randn", "randint", "shuffle",
-                               "choice", "uniform", "normal", "binomial", "poisson"]:
+            if (
+                node.value.id in self.import_aliases
+                and self.import_aliases[node.value.id] == "numpy.random"
+            ):
+                if node.attr in [
+                    "seed",
+                    "rand",
+                    "randn",
+                    "randint",
+                    "shuffle",
+                    "choice",
+                    "uniform",
+                    "normal",
+                    "binomial",
+                    "poisson",
+                ]:
                     self.legacy_calls.add(f"numpy.random.{node.attr}")
 
         self.generic_visit(node)
 
 
-def check_file_for_legacy_rng(file_path: Path) -> Set[str]:
+def check_file_for_legacy_rng(file_path: Path) -> set[str]:
     """Check a Python file for legacy NumPy RNG usage."""
     try:
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, encoding="utf-8") as f:
             content = f.read()
 
         tree = ast.parse(content, filename=str(file_path))
@@ -98,8 +117,9 @@ def test_no_legacy_numpy_random_in_source():
 def test_set_global_seed_uses_modern_api():
     """Test that set_global_seed uses modern NumPy API."""
 
-    from precise_mrd.determinism_utils.seed import set_global_seed
     import numpy as np
+
+    from precise_mrd.determinism_utils.seed import set_global_seed
 
     # Test that it returns a Generator
     rng = set_global_seed(42)
@@ -120,20 +140,35 @@ def test_modules_accept_rng_parameter():
     """Test that core modules accept RNG parameter."""
 
     import numpy as np
-    from precise_mrd.simulate import simulate_reads
-    from precise_mrd.collapse import collapse_umis
-    from precise_mrd.error_model import fit_error_model
+
     from precise_mrd.call import call_mrd
+    from precise_mrd.collapse import collapse_umis
     from precise_mrd.config import PipelineConfig
+    from precise_mrd.error_model import fit_error_model
+    from precise_mrd.simulate import simulate_reads
 
     # Create minimal config
     config = PipelineConfig(
         run_id="test",
         seed=42,
-        simulation={"allele_fractions": [0.01], "umi_depths": [1000], "n_replicates": 1, "n_bootstrap": 10},
-        umi={"min_family_size": 3, "max_family_size": 100, "quality_threshold": 20, "consensus_threshold": 0.6},
-        stats={"test_type": "poisson", "alpha": 0.05, "fdr_method": "benjamini_hochberg"},
-        lod={"detection_threshold": 0.95, "confidence_level": 0.95}
+        simulation={
+            "allele_fractions": [0.01],
+            "umi_depths": [1000],
+            "n_replicates": 1,
+            "n_bootstrap": 10,
+        },
+        umi={
+            "min_family_size": 3,
+            "max_family_size": 100,
+            "quality_threshold": 20,
+            "consensus_threshold": 0.6,
+        },
+        stats={
+            "test_type": "poisson",
+            "alpha": 0.05,
+            "fdr_method": "benjamini_hochberg",
+        },
+        lod={"detection_threshold": 0.95, "confidence_level": 0.95},
     )
 
     rng = np.random.default_rng(42)
@@ -161,6 +196,7 @@ def test_no_global_random_state_dependency():
     """Test that functions are independent of global random state."""
 
     import numpy as np
+
     from precise_mrd.determinism_utils.seed import set_global_seed
 
     # Set different global state

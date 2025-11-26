@@ -5,20 +5,20 @@ This module tests the pipeline's robustness to contamination and validates
 contamination detection and mitigation strategies.
 """
 
-import pytest
 import tempfile
-import numpy as np
-import pandas as pd
 from pathlib import Path
 
-from precise_mrd.config import PipelineConfig
-from precise_mrd.simulate import simulate_reads
-from precise_mrd.sim.contamination import simulate_contamination
-from precise_mrd.collapse import collapse_umis
+import numpy as np
+import pandas as pd
+import pytest
+
 from precise_mrd.call import call_mrd
+from precise_mrd.collapse import collapse_umis
+from precise_mrd.config import PipelineConfig
+from precise_mrd.determinism_utils import set_global_seed
 from precise_mrd.error_model import fit_error_model
 from precise_mrd.metrics import calculate_metrics
-from precise_mrd.determinism_utils import set_global_seed
+from precise_mrd.simulate import simulate_reads
 
 
 @pytest.mark.integration
@@ -46,16 +46,10 @@ class TestContaminationIntegration:
                     "allele_fractions": [0.01, 0.001],
                     "umi_depths": [5000],
                     "n_replicates": 5,
-                    "n_bootstrap": 50
+                    "n_bootstrap": 50,
                 },
-                "umi": {
-                    "min_family_size": 3,
-                    "consensus_threshold": 0.6
-                },
-                "stats": {
-                    "test_type": "poisson",
-                    "alpha": 0.05
-                }
+                "umi": {"min_family_size": 3, "consensus_threshold": 0.6},
+                "stats": {"test_type": "poisson", "alpha": 0.05},
             }
 
             config = PipelineConfig.from_dict(config_dict)
@@ -80,16 +74,10 @@ class TestContaminationIntegration:
                 "simulation": {
                     "allele_fractions": [0.01, 0.001, 0.0001],
                     "umi_depths": [10000],
-                    "n_replicates": 3
+                    "n_replicates": 3,
                 },
-                "umi": {
-                    "min_family_size": 2,
-                    "consensus_threshold": 0.7
-                },
-                "stats": {
-                    "test_type": "binomial",
-                    "alpha": 0.01
-                }
+                "umi": {"min_family_size": 2, "consensus_threshold": 0.7},
+                "stats": {"test_type": "binomial", "alpha": 0.01},
             }
 
             config = PipelineConfig.from_dict(config_dict)
@@ -114,16 +102,10 @@ class TestContaminationIntegration:
             "simulation": {
                 "allele_fractions": [0.01],
                 "umi_depths": [2000],
-                "n_replicates": 4
+                "n_replicates": 4,
             },
-            "umi": {
-                "min_family_size": 3,
-                "consensus_threshold": 0.6
-            },
-            "stats": {
-                "test_type": "poisson",
-                "alpha": 0.05
-            }
+            "umi": {"min_family_size": 3, "consensus_threshold": 0.6},
+            "stats": {"test_type": "poisson", "alpha": 0.05},
         }
 
         config = PipelineConfig.from_dict(config_dict)
@@ -146,16 +128,10 @@ class TestContaminationIntegration:
                 "simulation": {
                     "allele_fractions": [0.01, 0.001],
                     "umi_depths": [5000],
-                    "n_replicates": 5
+                    "n_replicates": 5,
                 },
-                "umi": {
-                    "min_family_size": threshold,
-                    "consensus_threshold": 0.6
-                },
-                "stats": {
-                    "test_type": "poisson",
-                    "alpha": 0.05
-                }
+                "umi": {"min_family_size": threshold, "consensus_threshold": 0.6},
+                "stats": {"test_type": "poisson", "alpha": 0.05},
             }
 
             config = PipelineConfig.from_dict(config_dict)
@@ -170,7 +146,12 @@ class TestContaminationIntegration:
 
     def test_background_subtraction_methods(self, temp_dir):
         """Test different background subtraction approaches."""
-        subtraction_methods = ["none", "blank_control", "negative_control", "estimated_rate"]
+        subtraction_methods = [
+            "none",
+            "blank_control",
+            "negative_control",
+            "estimated_rate",
+        ]
 
         for method in subtraction_methods:
             config_dict = {
@@ -179,16 +160,10 @@ class TestContaminationIntegration:
                 "simulation": {
                     "allele_fractions": [0.01],
                     "umi_depths": [5000],
-                    "n_replicates": 5
+                    "n_replicates": 5,
                 },
-                "umi": {
-                    "min_family_size": 3,
-                    "consensus_threshold": 0.6
-                },
-                "stats": {
-                    "test_type": "poisson",
-                    "alpha": 0.05
-                }
+                "umi": {"min_family_size": 3, "consensus_threshold": 0.6},
+                "stats": {"test_type": "poisson", "alpha": 0.05},
             }
 
             config = PipelineConfig.from_dict(config_dict)
@@ -201,8 +176,13 @@ class TestContaminationIntegration:
             # Validate subtraction method effectiveness
             self._validate_subtraction_method(result, method)
 
-    def _run_pipeline_with_contamination(self, config: PipelineConfig, output_path: Path,
-                                       contamination_type: str, rate: float) -> dict:
+    def _run_pipeline_with_contamination(
+        self,
+        config: PipelineConfig,
+        output_path: Path,
+        contamination_type: str,
+        rate: float,
+    ) -> dict:
         """Run pipeline with simulated contamination."""
         set_global_seed(config.seed)
         rng = np.random.default_rng(config.seed)
@@ -231,23 +211,25 @@ class TestContaminationIntegration:
             config,
             rng,
             use_ml_calling=False,
-            use_deep_learning=False
+            use_deep_learning=False,
         )
 
         metrics = calculate_metrics(calls_df, config)
 
         return {
-            'reads_df': reads_df,
-            'contaminated_df': contaminated_df,
-            'collapsed_df': collapsed_df,
-            'calls_df': calls_df,
-            'metrics': metrics,
-            'config': config,
-            'contamination_rate': rate,
-            'contamination_type': contamination_type
+            "reads_df": reads_df,
+            "contaminated_df": contaminated_df,
+            "collapsed_df": collapsed_df,
+            "calls_df": calls_df,
+            "metrics": metrics,
+            "config": config,
+            "contamination_rate": rate,
+            "contamination_type": contamination_type,
         }
 
-    def _apply_index_hopping(self, reads_df: pd.DataFrame, rate: float, rng: np.random.Generator) -> pd.DataFrame:
+    def _apply_index_hopping(
+        self, reads_df: pd.DataFrame, rate: float, rng: np.random.Generator
+    ) -> pd.DataFrame:
         """Apply index hopping contamination to reads."""
         contaminated_df = reads_df.copy()
 
@@ -260,17 +242,19 @@ class TestContaminationIntegration:
             hop_indices = rng.choice(n_reads, n_hopped, replace=False)
 
             # Simulate hopping by changing sample IDs
-            unique_samples = contaminated_df['sample_id'].unique()
+            unique_samples = contaminated_df["sample_id"].unique()
             for idx in hop_indices:
-                current_sample = contaminated_df.at[idx, 'sample_id']
+                current_sample = contaminated_df.at[idx, "sample_id"]
                 other_samples = [s for s in unique_samples if s != current_sample]
                 if other_samples:
                     new_sample = rng.choice(other_samples)
-                    contaminated_df.at[idx, 'sample_id'] = new_sample
+                    contaminated_df.at[idx, "sample_id"] = new_sample
 
         return contaminated_df
 
-    def _apply_carryover(self, reads_df: pd.DataFrame, rate: float, rng: np.random.Generator) -> pd.DataFrame:
+    def _apply_carryover(
+        self, reads_df: pd.DataFrame, rate: float, rng: np.random.Generator
+    ) -> pd.DataFrame:
         """Apply sample carryover contamination to reads."""
         contaminated_df = reads_df.copy()
 
@@ -280,7 +264,7 @@ class TestContaminationIntegration:
 
         if n_carryover > 0:
             # Create carryover reads
-            unique_samples = contaminated_df['sample_id'].unique()
+            unique_samples = contaminated_df["sample_id"].unique()
 
             for _ in range(n_carryover):
                 # Choose a random sample to contaminate
@@ -289,11 +273,17 @@ class TestContaminationIntegration:
                 source_sample = rng.choice(source_samples)
 
                 # Create carryover read
-                carryover_read = contaminated_df[contaminated_df['sample_id'] == source_sample].iloc[0].copy()
-                carryover_read['sample_id'] = target_sample
-                carryover_read['family_id'] = f"carryover_{rng.integers(1000000)}"
+                carryover_read = (
+                    contaminated_df[contaminated_df["sample_id"] == source_sample]
+                    .iloc[0]
+                    .copy()
+                )
+                carryover_read["sample_id"] = target_sample
+                carryover_read["family_id"] = f"carryover_{rng.integers(1000000)}"
 
-                contaminated_df = pd.concat([contaminated_df, pd.DataFrame([carryover_read])], ignore_index=True)
+                contaminated_df = pd.concat(
+                    [contaminated_df, pd.DataFrame([carryover_read])], ignore_index=True
+                )
 
         return contaminated_df
 
@@ -301,66 +291,75 @@ class TestContaminationIntegration:
         """Validate that index hopping affects results as expected."""
         # Extract metrics for each rate
         metrics_by_rate = {}
-        for result, rate in zip(results, hop_rates):
-            metrics_by_rate[rate] = result['metrics']
+        for result, rate in zip(results, hop_rates, strict=False):
+            metrics_by_rate[rate] = result["metrics"]
 
         # Higher hop rates should generally decrease performance
         for i in range(1, len(hop_rates)):
-            if hop_rates[i] > hop_rates[i-1]:
+            if hop_rates[i] > hop_rates[i - 1]:
                 # Performance should not improve significantly with higher contamination
-                current_auc = metrics_by_rate[hop_rates[i]]['roc_auc']
-                prev_auc = metrics_by_rate[hop_rates[i-1]]['roc_auc']
-                assert current_auc <= prev_auc * 1.1, f"Unexpected performance improvement with contamination rate {hop_rates[i]}"
+                current_auc = metrics_by_rate[hop_rates[i]]["roc_auc"]
+                prev_auc = metrics_by_rate[hop_rates[i - 1]]["roc_auc"]
+                assert current_auc <= prev_auc * 1.1, (
+                    f"Unexpected performance improvement with contamination rate {hop_rates[i]}"
+                )
 
     def _validate_carryover_impact(self, result: dict, rate: float):
         """Validate carryover contamination impact."""
-        calls_df = result['calls_df']
+        calls_df = result["calls_df"]
 
         # Should still detect true variants even with carryover
         true_variants = calls_df[
-            (calls_df['allele_fraction'] >= 0.01) &
-            (calls_df['is_variant'] == True)
+            (calls_df["allele_fraction"] >= 0.01) & (calls_df["is_variant"])
         ]
 
         # Should have some true positive detections
-        assert len(true_variants) > 0, f"Should detect true variants even with carryover rate {rate}"
+        assert len(true_variants) > 0, (
+            f"Should detect true variants even with carryover rate {rate}"
+        )
 
-    def _validate_multiplex_results(self, result: dict, contamination_matrix: np.ndarray):
+    def _validate_multiplex_results(
+        self, result: dict, contamination_matrix: np.ndarray
+    ):
         """Validate multiplexed sample results."""
-        calls_df = result['calls_df']
+        calls_df = result["calls_df"]
 
         # Should have results for multiple samples
-        unique_samples = calls_df['sample_id'].unique()
+        unique_samples = calls_df["sample_id"].unique()
         assert len(unique_samples) > 1, "Should have results for multiple samples"
 
         # Each sample should have some calls
         for sample in unique_samples:
-            sample_calls = calls_df[calls_df['sample_id'] == sample]
+            sample_calls = calls_df[calls_df["sample_id"] == sample]
             assert len(sample_calls) > 0, f"Sample {sample} should have calls"
 
     def _validate_umi_filtering(self, result: dict, threshold: int):
         """Validate UMI-based contamination filtering."""
-        calls_df = result['calls_df']
-        collapsed_df = result['collapsed_df']
+        calls_df = result["calls_df"]
+        collapsed_df = result["collapsed_df"]
 
         # Higher thresholds should result in fewer but higher quality calls
         n_calls = len(calls_df)
-        mean_family_size = collapsed_df['family_size'].mean()
+        mean_family_size = collapsed_df["family_size"].mean()
 
         # Should have reasonable number of calls
-        assert n_calls > 0, f"Should have calls even with family size threshold {threshold}"
+        assert n_calls > 0, (
+            f"Should have calls even with family size threshold {threshold}"
+        )
 
         # Mean family size should be above threshold
-        assert mean_family_size >= threshold * 0.8, f"Mean family size should be above threshold {threshold}"
+        assert mean_family_size >= threshold * 0.8, (
+            f"Mean family size should be above threshold {threshold}"
+        )
 
     def _validate_subtraction_method(self, result: dict, method: str):
         """Validate background subtraction method effectiveness."""
-        calls_df = result['calls_df']
+        calls_df = result["calls_df"]
 
         # Should still produce valid statistical results
-        assert calls_df['p_value'].notna().all(), "All p-values should be valid"
-        assert (calls_df['p_value'] >= 0).all(), "P-values should be non-negative"
-        assert (calls_df['p_value'] <= 1).all(), "P-values should be <= 1"
+        assert calls_df["p_value"].notna().all(), "All p-values should be valid"
+        assert (calls_df["p_value"] >= 0).all(), "P-values should be non-negative"
+        assert (calls_df["p_value"] <= 1).all(), "P-values should be <= 1"
 
 
 @pytest.mark.integration
@@ -380,16 +379,10 @@ class TestContaminationMitigation:
                 "simulation": {
                     "allele_fractions": [0.01],
                     "umi_depths": [5000],
-                    "n_replicates": 3
+                    "n_replicates": 3,
                 },
-                "umi": {
-                    "min_family_size": 2,
-                    "consensus_threshold": 0.6
-                },
-                "stats": {
-                    "test_type": "poisson",
-                    "alpha": 0.05
-                }
+                "umi": {"min_family_size": 2, "consensus_threshold": 0.6},
+                "stats": {"test_type": "poisson", "alpha": 0.05},
             }
 
             config = PipelineConfig.from_dict(config_dict)
@@ -402,8 +395,9 @@ class TestContaminationMitigation:
             # Validate deduplication effectiveness
             self._validate_deduplication_method(result, method)
 
-    def _run_pipeline_with_deduplication(self, config: PipelineConfig, output_path: Path,
-                                       deduplication_method: str) -> dict:
+    def _run_pipeline_with_deduplication(
+        self, config: PipelineConfig, output_path: Path, deduplication_method: str
+    ) -> dict:
         """Run pipeline with specified deduplication method."""
         set_global_seed(config.seed)
         rng = np.random.default_rng(config.seed)
@@ -431,29 +425,29 @@ class TestContaminationMitigation:
             config,
             rng,
             use_ml_calling=False,
-            use_deep_learning=False
+            use_deep_learning=False,
         )
 
         metrics = calculate_metrics(calls_df, config)
 
         return {
-            'reads_df': reads_df,
-            'collapsed_df': collapsed_df,
-            'calls_df': calls_df,
-            'metrics': metrics,
-            'config': config,
-            'deduplication_method': deduplication_method
+            "reads_df": reads_df,
+            "collapsed_df": collapsed_df,
+            "calls_df": calls_df,
+            "metrics": metrics,
+            "config": config,
+            "deduplication_method": deduplication_method,
         }
 
     def _validate_deduplication_method(self, result: dict, method: str):
         """Validate deduplication method effectiveness."""
-        calls_df = result['calls_df']
-        collapsed_df = result['collapsed_df']
+        calls_df = result["calls_df"]
+        collapsed_df = result["collapsed_df"]
 
         # Should have fewer but higher quality calls with more aggressive deduplication
         n_calls = len(calls_df)
-        mean_quality = collapsed_df['quality_score'].mean()
-        mean_consensus = collapsed_df['consensus_agreement'].mean()
+        mean_quality = collapsed_df["quality_score"].mean()
+        mean_consensus = collapsed_df["consensus_agreement"].mean()
 
         assert n_calls > 0, f"Should have calls with deduplication method {method}"
         assert mean_quality > 0, "Should have positive quality scores"
