@@ -2,12 +2,15 @@
 
 import logging
 import sys
+
 import structlog
+
 from .settings import settings
+
 
 def setup_logging(log_level: str = None):
     """Configure structured logging for the application."""
-    
+
     # Use log level from settings if not explicitly provided
     level = log_level or settings.LOG_LEVEL
 
@@ -33,12 +36,7 @@ def setup_logging(log_level: str = None):
         cache_logger_on_first_use=True,
     )
 
+
 def get_logger(name: str) -> structlog.stdlib.BoundLogger:
     """Get a configured logger for a specific module."""
     return structlog.get_logger(name)
-
-
-
-
-
-

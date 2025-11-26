@@ -2,16 +2,17 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from typing import Any
+
 import numpy as np
 import pandas as pd
 from scipy import stats
-from sklearn.model_selection import KFold, StratifiedKFold, cross_val_score
-from sklearn.metrics import roc_auc_score, average_precision_score, confusion_matrix
-from typing import Dict, List, Tuple, Optional, Any, Callable
-import warnings
+from sklearn.metrics import average_precision_score, roc_auc_score
+from sklearn.model_selection import KFold, StratifiedKFold
 
 from .config import PipelineConfig
-from .performance import IntelligentCache, CacheStrategy
+from .performance import CacheStrategy, IntelligentCache
 
 
 class CrossValidator:
@@ -21,13 +22,15 @@ class CrossValidator:
         self.config = config
         self.cache = IntelligentCache(memory_limit_mb=200, disk_cache_dir=".cv_cache")
 
-    def k_fold_cross_validation(self,
-                               X: np.ndarray,
-                               y: np.ndarray,
-                               model_func: Callable,
-                               k_folds: int = 5,
-                               scoring: str = 'roc_auc',
-                               stratified: bool = True) -> Dict[str, Any]:
+    def k_fold_cross_validation(
+        self,
+        X: np.ndarray,
+        y: np.ndarray,
+        model_func: Callable,
+        k_folds: int = 5,
+        scoring: str = "roc_auc",
+        stratified: bool = True,
+    ) -> dict[str, Any]:
         """Perform k-fold cross-validation with comprehensive metrics.
 
         Args:
@@ -49,7 +52,9 @@ class CrossValidator:
 
         # Choose cross-validation strategy
         if stratified and len(np.unique(y)) > 1:
-            cv = StratifiedKFold(n_splits=k_folds, shuffle=True, random_state=self.config.seed)
+            cv = StratifiedKFold(
+                n_splits=k_folds, shuffle=True, random_state=self.config.seed
+            )
         else:
             cv = KFold(n_splits=k_folds, shuffle=True, random_state=self.config.seed)
 
@@ -65,7 +70,7 @@ class CrossValidator:
             model = model_func(X_train, y_train)
 
             # Make predictions
-            if hasattr(model, 'predict_proba'):
+            if hasattr(model, "predict_proba"):
                 y_pred_proba = model.predict_proba(X_test)[:, 1]
             else:
                 y_pred_proba = model.decision_function(X_test)
@@ -73,52 +78,58 @@ class CrossValidator:
             # Calculate metrics for this fold
             fold_metrics = self._calculate_fold_metrics(y_test, y_pred_proba, scoring)
 
-            scores.append(fold_metrics['score'])
-            fold_results.append({
-                'fold': fold_idx,
-                'train_size': len(X_train),
-                'test_size': len(X_test),
-                'metrics': fold_metrics
-            })
+            scores.append(fold_metrics["score"])
+            fold_results.append(
+                {
+                    "fold": fold_idx,
+                    "train_size": len(X_train),
+                    "test_size": len(X_test),
+                    "metrics": fold_metrics,
+                }
+            )
 
         # Calculate comprehensive statistics
         scores = np.array(scores)
         results = {
-            'mean_score': np.mean(scores),
-            'std_score': np.std(scores),
-            'scores': scores.tolist(),
-            'confidence_interval': self._bootstrap_ci(scores),
-            'fold_results': fold_results,
-            'k_folds': k_folds,
-            'scoring_metric': scoring,
-            'total_samples': len(X),
-            'n_features': X.shape[1] if len(X.shape) > 1 else 1,
-            'class_distribution': np.bincount(y).tolist() if len(y) > 0 else [],
-            'config_hash': self.config.config_hash
+            "mean_score": np.mean(scores),
+            "std_score": np.std(scores),
+            "scores": scores.tolist(),
+            "confidence_interval": self._bootstrap_ci(scores),
+            "fold_results": fold_results,
+            "k_folds": k_folds,
+            "scoring_metric": scoring,
+            "total_samples": len(X),
+            "n_features": X.shape[1] if len(X.shape) > 1 else 1,
+            "class_distribution": np.bincount(y).tolist() if len(y) > 0 else [],
+            "config_hash": self.config.config_hash,
         }
 
         self.cache.put(cache_key, results, CacheStrategy.MEMORY, ttl=3600)
         return results
 
-    def _calculate_fold_metrics(self, y_true: np.ndarray, y_pred_proba: np.ndarray, scoring: str) -> Dict[str, float]:
+    def _calculate_fold_metrics(
+        self, y_true: np.ndarray, y_pred_proba: np.ndarray, scoring: str
+    ) -> dict[str, float]:
         """Calculate metrics for a single fold."""
-        if scoring == 'roc_auc':
+        if scoring == "roc_auc":
             score = roc_auc_score(y_true, y_pred_proba)
-        elif scoring == 'average_precision':
+        elif scoring == "average_precision":
             score = average_precision_score(y_true, y_pred_proba)
-        elif scoring == 'accuracy':
+        elif scoring == "accuracy":
             y_pred = (y_pred_proba > 0.5).astype(int)
             score = np.mean(y_true == y_pred)
         else:
             raise ValueError(f"Unknown scoring metric: {scoring}")
 
         return {
-            'score': score,
-            'n_samples': len(y_true),
-            'positive_rate': np.mean(y_true)
+            "score": score,
+            "n_samples": len(y_true),
+            "positive_rate": np.mean(y_true),
         }
 
-    def _bootstrap_ci(self, scores: np.ndarray, confidence: float = 0.95) -> Tuple[float, float]:
+    def _bootstrap_ci(
+        self, scores: np.ndarray, confidence: float = 0.95
+    ) -> tuple[float, float]:
         """Calculate bootstrap confidence interval for CV scores."""
         n_bootstrap = 1000
         bootstrap_scores = []
@@ -132,7 +143,7 @@ class CrossValidator:
 
         return (
             np.percentile(bootstrap_scores, alpha * 100),
-            np.percentile(bootstrap_scores, (1 - alpha) * 100)
+            np.percentile(bootstrap_scores, (1 - alpha) * 100),
         )
 
 
@@ -142,9 +153,9 @@ class UncertaintyQuantifier:
     def __init__(self, config: PipelineConfig):
         self.config = config
 
-    def bayesian_uncertainty(self,
-                           posterior_samples: List[np.ndarray],
-                           credible_interval: float = 0.95) -> Dict[str, Any]:
+    def bayesian_uncertainty(
+        self, posterior_samples: list[np.ndarray], credible_interval: float = 0.95
+    ) -> dict[str, Any]:
         """Quantify uncertainty using Bayesian credible intervals.
 
         Args:
@@ -155,7 +166,7 @@ class UncertaintyQuantifier:
             Uncertainty quantification results
         """
         if not posterior_samples:
-            return {'error': 'No posterior samples provided'}
+            return {"error": "No posterior samples provided"}
 
         # Stack samples for analysis
         samples_array = np.array(posterior_samples)
@@ -171,19 +182,23 @@ class UncertaintyQuantifier:
         hpdi_lower, hpdi_upper = self._hpdi(samples_array, credible_interval)
 
         return {
-            'mean': mean.tolist(),
-            'median': median.tolist(),
-            'credible_interval_lower': lower_percentile.tolist(),
-            'credible_interval_upper': upper_percentile.tolist(),
-            'hpdi_lower': hpdi_lower.tolist(),
-            'hpdi_upper': hpdi_upper.tolist(),
-            'credible_interval_width': credible_interval,
-            'n_samples': len(posterior_samples),
-            'n_parameters': samples_array.shape[1] if len(samples_array.shape) > 1 else 1,
-            'method': 'bayesian_credible_intervals'
+            "mean": mean.tolist(),
+            "median": median.tolist(),
+            "credible_interval_lower": lower_percentile.tolist(),
+            "credible_interval_upper": upper_percentile.tolist(),
+            "hpdi_lower": hpdi_lower.tolist(),
+            "hpdi_upper": hpdi_upper.tolist(),
+            "credible_interval_width": credible_interval,
+            "n_samples": len(posterior_samples),
+            "n_parameters": samples_array.shape[1]
+            if len(samples_array.shape) > 1
+            else 1,
+            "method": "bayesian_credible_intervals",
         }
 
-    def _hpdi(self, samples: np.ndarray, credible_interval: float) -> Tuple[np.ndarray, np.ndarray]:
+    def _hpdi(
+        self, samples: np.ndarray, credible_interval: float
+    ) -> tuple[np.ndarray, np.ndarray]:
         """Calculate highest posterior density interval."""
         # Simplified HPDI calculation
         # In practice, this would use more sophisticated methods
@@ -214,12 +229,14 @@ class UncertaintyQuantifier:
 
         return np.array(hpdi_lower), np.array(hpdi_upper)
 
-    def conformal_prediction(self,
-                           X_train: np.ndarray,
-                           y_train: np.ndarray,
-                           X_test: np.ndarray,
-                           model_func: Callable,
-                           confidence_level: float = 0.95) -> Dict[str, Any]:
+    def conformal_prediction(
+        self,
+        X_train: np.ndarray,
+        y_train: np.ndarray,
+        X_test: np.ndarray,
+        model_func: Callable,
+        confidence_level: float = 0.95,
+    ) -> dict[str, Any]:
         """Apply conformal prediction for uncertainty quantification.
 
         Args:
@@ -236,7 +253,7 @@ class UncertaintyQuantifier:
         model = model_func(X_train, y_train)
 
         # Get predictions on training data for calibration
-        if hasattr(model, 'predict_proba'):
+        if hasattr(model, "predict_proba"):
             train_pred_proba = model.predict_proba(X_train)[:, 1]
         else:
             train_pred_proba = model.decision_function(X_train)
@@ -245,7 +262,7 @@ class UncertaintyQuantifier:
         train_scores = np.abs(y_train - train_pred_proba)
 
         # Get predictions on test data
-        if hasattr(model, 'predict_proba'):
+        if hasattr(model, "predict_proba"):
             test_pred_proba = model.predict_proba(X_test)[:, 1]
         else:
             test_pred_proba = model.decision_function(X_test)
@@ -261,13 +278,13 @@ class UncertaintyQuantifier:
             prediction_intervals.append((lower, upper))
 
         return {
-            'test_predictions': test_pred_proba.tolist(),
-            'prediction_intervals': prediction_intervals,
-            'confidence_level': confidence_level,
-            'calibration_quantile': q_hat,
-            'n_train_samples': len(X_train),
-            'n_test_samples': len(X_test),
-            'method': 'conformal_prediction'
+            "test_predictions": test_pred_proba.tolist(),
+            "prediction_intervals": prediction_intervals,
+            "confidence_level": confidence_level,
+            "calibration_quantile": q_hat,
+            "n_train_samples": len(X_train),
+            "n_test_samples": len(X_test),
+            "method": "conformal_prediction",
         }
 
 
@@ -278,9 +295,9 @@ class StatisticalTester:
         self.config = config
         self.alpha = config.stats.alpha
 
-    def multiple_testing_correction(self,
-                                  p_values: np.ndarray,
-                                  method: str = 'benjamini_hochberg') -> Dict[str, Any]:
+    def multiple_testing_correction(
+        self, p_values: np.ndarray, method: str = "benjamini_hochberg"
+    ) -> dict[str, Any]:
         """Apply multiple testing correction to p-values.
 
         Args:
@@ -293,12 +310,12 @@ class StatisticalTester:
         p_values = np.asarray(p_values, dtype=float)
         m = len(p_values)
 
-        if method == 'bonferroni':
+        if method == "bonferroni":
             # Bonferroni correction
             adjusted_p = np.minimum(p_values * m, 1.0)
             rejected = adjusted_p < self.alpha
 
-        elif method == 'benjamini_hochberg':
+        elif method == "benjamini_hochberg":
             # Benjamini-Hochberg FDR correction
             sorted_indices = np.argsort(p_values)
             sorted_p = p_values[sorted_indices]
@@ -307,7 +324,7 @@ class StatisticalTester:
             rejected = np.zeros(m, dtype=bool)
             for i in range(m - 1, -1, -1):
                 if sorted_p[i] <= (i + 1) / m * self.alpha:
-                    rejected[sorted_indices[:i + 1]] = True
+                    rejected[sorted_indices[: i + 1]] = True
                     break
 
             # Adjusted p-values
@@ -323,7 +340,7 @@ class StatisticalTester:
             final_adjusted = np.zeros_like(p_values)
             final_adjusted[sorted_indices] = adjusted_p
 
-        elif method == 'holm':
+        elif method == "holm":
             # Holm-Bonferroni method
             sorted_indices = np.argsort(p_values)
             sorted_p = p_values[sorted_indices]
@@ -350,20 +367,22 @@ class StatisticalTester:
             raise ValueError(f"Unknown correction method: {method}")
 
         return {
-            'original_p_values': p_values.tolist(),
-            'adjusted_p_values': final_adjusted.tolist(),
-            'rejected': rejected.tolist(),
-            'n_tests': m,
-            'correction_method': method,
-            'alpha': self.alpha,
-            'n_rejected': int(np.sum(rejected))
+            "original_p_values": p_values.tolist(),
+            "adjusted_p_values": final_adjusted.tolist(),
+            "rejected": rejected.tolist(),
+            "n_tests": m,
+            "correction_method": method,
+            "alpha": self.alpha,
+            "n_rejected": int(np.sum(rejected)),
         }
 
-    def power_analysis(self,
-                      effect_sizes: List[float],
-                      sample_sizes: List[int],
-                      alpha: float = 0.05,
-                      n_simulations: int = 1000) -> Dict[str, Any]:
+    def power_analysis(
+        self,
+        effect_sizes: list[float],
+        sample_sizes: list[int],
+        alpha: float = 0.05,
+        n_simulations: int = 1000,
+    ) -> dict[str, Any]:
         """Statistical power analysis for different effect sizes and sample sizes.
 
         Args:
@@ -403,23 +422,23 @@ class StatisticalTester:
                 type_i_error = null_rejections / n_simulations
 
                 power_results[str(effect_size)][str(sample_size)] = {
-                    'power': power,
-                    'type_i_error': type_i_error,
-                    'n_simulations': n_simulations,
-                    'effect_size': effect_size,
-                    'sample_size': sample_size,
-                    'alpha': alpha
+                    "power": power,
+                    "type_i_error": type_i_error,
+                    "n_simulations": n_simulations,
+                    "effect_size": effect_size,
+                    "sample_size": sample_size,
+                    "alpha": alpha,
                 }
 
         return {
-            'power_analysis': power_results,
-            'parameters': {
-                'effect_sizes': effect_sizes,
-                'sample_sizes': sample_sizes,
-                'alpha': alpha,
-                'n_simulations': n_simulations
+            "power_analysis": power_results,
+            "parameters": {
+                "effect_sizes": effect_sizes,
+                "sample_sizes": sample_sizes,
+                "alpha": alpha,
+                "n_simulations": n_simulations,
             },
-            'method': 'simulation_based_power_analysis'
+            "method": "simulation_based_power_analysis",
         }
 
 
@@ -429,10 +448,12 @@ class RobustnessAnalyzer:
     def __init__(self, config: PipelineConfig):
         self.config = config
 
-    def sensitivity_analysis(self,
-                           collapsed_df: pd.DataFrame,
-                           perturbation_types: List[str] = None,
-                           perturbation_magnitudes: List[float] = None) -> Dict[str, Any]:
+    def sensitivity_analysis(
+        self,
+        collapsed_df: pd.DataFrame,
+        perturbation_types: list[str] = None,
+        perturbation_magnitudes: list[float] = None,
+    ) -> dict[str, Any]:
         """Perform sensitivity analysis on model parameters.
 
         Args:
@@ -444,7 +465,7 @@ class RobustnessAnalyzer:
             Sensitivity analysis results
         """
         if perturbation_types is None:
-            perturbation_types = ['family_size', 'quality_score', 'background_rate']
+            perturbation_types = ["family_size", "quality_score", "background_rate"]
 
         if perturbation_magnitudes is None:
             perturbation_magnitudes = [0.8, 0.9, 1.1, 1.2]  # 20% perturbations
@@ -456,45 +477,51 @@ class RobustnessAnalyzer:
 
             for magnitude in perturbation_magnitudes:
                 # Apply perturbation
-                perturbed_df = self._apply_perturbation(collapsed_df.copy(), pert_type, magnitude)
+                perturbed_df = self._apply_perturbation(
+                    collapsed_df.copy(), pert_type, magnitude
+                )
 
                 # Calculate metrics on perturbed data
                 # This would integrate with the main pipeline
                 # For now, calculate basic statistics
                 sensitivity_results[pert_type][str(magnitude)] = {
-                    'perturbation_type': pert_type,
-                    'magnitude': magnitude,
-                    'n_samples': len(perturbed_df),
-                    'mean_family_size': perturbed_df['family_size'].mean(),
-                    'mean_quality': perturbed_df['quality_score'].mean(),
-                    'variant_rate': perturbed_df['is_variant'].mean()
+                    "perturbation_type": pert_type,
+                    "magnitude": magnitude,
+                    "n_samples": len(perturbed_df),
+                    "mean_family_size": perturbed_df["family_size"].mean(),
+                    "mean_quality": perturbed_df["quality_score"].mean(),
+                    "variant_rate": perturbed_df["is_variant"].mean(),
                 }
 
         return {
-            'sensitivity_analysis': sensitivity_results,
-            'perturbation_types': perturbation_types,
-            'perturbation_magnitudes': perturbation_magnitudes,
-            'method': 'parameter_sensitivity_analysis'
+            "sensitivity_analysis": sensitivity_results,
+            "perturbation_types": perturbation_types,
+            "perturbation_magnitudes": perturbation_magnitudes,
+            "method": "parameter_sensitivity_analysis",
         }
 
-    def _apply_perturbation(self, df: pd.DataFrame, pert_type: str, magnitude: float) -> pd.DataFrame:
+    def _apply_perturbation(
+        self, df: pd.DataFrame, pert_type: str, magnitude: float
+    ) -> pd.DataFrame:
         """Apply perturbation to specified parameter."""
-        if pert_type == 'family_size':
-            df['family_size'] = (df['family_size'] * magnitude).astype(int)
-            df['family_size'] = np.clip(df['family_size'], 1, 1000)
-        elif pert_type == 'quality_score':
-            df['quality_score'] = df['quality_score'] * magnitude
-            df['quality_score'] = np.clip(df['quality_score'], 0, 40)
-        elif pert_type == 'background_rate':
-            df['background_rate'] = df['background_rate'] * magnitude
-            df['background_rate'] = np.clip(df['background_rate'], 1e-6, 1e-2)
+        if pert_type == "family_size":
+            df["family_size"] = (df["family_size"] * magnitude).astype(int)
+            df["family_size"] = np.clip(df["family_size"], 1, 1000)
+        elif pert_type == "quality_score":
+            df["quality_score"] = df["quality_score"] * magnitude
+            df["quality_score"] = np.clip(df["quality_score"], 0, 40)
+        elif pert_type == "background_rate":
+            df["background_rate"] = df["background_rate"] * magnitude
+            df["background_rate"] = np.clip(df["background_rate"], 1e-6, 1e-2)
 
         return df
 
-    def bootstrap_robustness(self,
-                           collapsed_df: pd.DataFrame,
-                           n_bootstrap: int = 100,
-                           metrics_func: Optional[Callable] = None) -> Dict[str, Any]:
+    def bootstrap_robustness(
+        self,
+        collapsed_df: pd.DataFrame,
+        n_bootstrap: int = 100,
+        metrics_func: Callable | None = None,
+    ) -> dict[str, Any]:
         """Assess robustness using bootstrap resampling.
 
         Args:
@@ -506,12 +533,14 @@ class RobustnessAnalyzer:
             Bootstrap robustness analysis
         """
         if metrics_func is None:
+
             def default_metrics(df):
                 return {
-                    'variant_rate': df['is_variant'].mean(),
-                    'mean_family_size': df['family_size'].mean(),
-                    'mean_quality': df['quality_score'].mean()
+                    "variant_rate": df["is_variant"].mean(),
+                    "mean_family_size": df["family_size"].mean(),
+                    "mean_quality": df["quality_score"].mean(),
                 }
+
             metrics_func = default_metrics
 
         rng = np.random.default_rng(self.config.seed)
@@ -519,7 +548,9 @@ class RobustnessAnalyzer:
 
         for _ in range(n_bootstrap):
             # Bootstrap sample
-            indices = rng.choice(len(collapsed_df), size=len(collapsed_df), replace=True)
+            indices = rng.choice(
+                len(collapsed_df), size=len(collapsed_df), replace=True
+            )
             bootstrap_sample = collapsed_df.iloc[indices]
 
             # Calculate metrics
@@ -533,19 +564,21 @@ class RobustnessAnalyzer:
         for column in metrics_df.columns:
             values = metrics_df[column].values
             robustness_stats[column] = {
-                'mean': np.mean(values),
-                'std': np.std(values),
-                'ci_lower': np.percentile(values, 2.5),
-                'ci_upper': np.percentile(values, 97.5),
-                'coefficient_of_variation': np.std(values) / abs(np.mean(values)) if np.mean(values) != 0 else 0
+                "mean": np.mean(values),
+                "std": np.std(values),
+                "ci_lower": np.percentile(values, 2.5),
+                "ci_upper": np.percentile(values, 97.5),
+                "coefficient_of_variation": np.std(values) / abs(np.mean(values))
+                if np.mean(values) != 0
+                else 0,
             }
 
         return {
-            'robustness_statistics': robustness_stats,
-            'n_bootstrap': n_bootstrap,
-            'n_metrics': len(metrics_df.columns),
-            'original_sample_size': len(collapsed_df),
-            'method': 'bootstrap_robustness_analysis'
+            "robustness_statistics": robustness_stats,
+            "n_bootstrap": n_bootstrap,
+            "n_metrics": len(metrics_df.columns),
+            "original_sample_size": len(collapsed_df),
+            "method": "bootstrap_robustness_analysis",
         }
 
 
@@ -555,11 +588,13 @@ class ModelValidator:
     def __init__(self, config: PipelineConfig):
         self.config = config
 
-    def compare_models(self,
-                     X: np.ndarray,
-                     y: np.ndarray,
-                     model_functions: Dict[str, Callable],
-                     scoring: str = 'roc_auc') -> Dict[str, Any]:
+    def compare_models(
+        self,
+        X: np.ndarray,
+        y: np.ndarray,
+        model_functions: dict[str, Callable],
+        scoring: str = "roc_auc",
+    ) -> dict[str, Any]:
         """Compare multiple models using cross-validation.
 
         Args:
@@ -578,7 +613,9 @@ class ModelValidator:
 
             # Perform cross-validation
             cv = CrossValidator(self.config)
-            results = cv.k_fold_cross_validation(X, y, model_func, k_folds=5, scoring=scoring)
+            results = cv.k_fold_cross_validation(
+                X, y, model_func, k_folds=5, scoring=scoring
+            )
 
             cv_results[model_name] = results
 
@@ -586,37 +623,40 @@ class ModelValidator:
         model_names = list(cv_results.keys())
         if len(model_names) >= 2:
             # Compare model performances
-            scores_dict = {name: results['scores'] for name, results in cv_results.items()}
+            scores_dict = {
+                name: results["scores"] for name, results in cv_results.items()
+            }
 
             # Simple t-test for model comparison (could be enhanced)
             comparison_results = {}
             for i, name1 in enumerate(model_names):
-                for name2 in model_names[i+1:]:
+                for name2 in model_names[i + 1 :]:
                     scores1 = np.array(scores_dict[name1])
                     scores2 = np.array(scores_dict[name2])
 
                     t_stat, p_value = stats.ttest_rel(scores1, scores2)
 
                     comparison_results[f"{name1}_vs_{name2}"] = {
-                        't_statistic': t_stat,
-                        'p_value': p_value,
-                        'mean_score_1': np.mean(scores1),
-                        'mean_score_2': np.mean(scores2),
-                        'score_1_better': np.mean(scores1) > np.mean(scores2)
+                        "t_statistic": t_stat,
+                        "p_value": p_value,
+                        "mean_score_1": np.mean(scores1),
+                        "mean_score_2": np.mean(scores2),
+                        "score_1_better": np.mean(scores1) > np.mean(scores2),
                     }
 
         return {
-            'model_results': cv_results,
-            'model_comparison': comparison_results if len(model_names) >= 2 else {},
-            'best_model': max(cv_results.items(), key=lambda x: x[1]['mean_score'])[0] if cv_results else None,
-            'scoring_metric': scoring,
-            'n_models': len(model_functions)
+            "model_results": cv_results,
+            "model_comparison": comparison_results if len(model_names) >= 2 else {},
+            "best_model": max(cv_results.items(), key=lambda x: x[1]["mean_score"])[0]
+            if cv_results
+            else None,
+            "scoring_metric": scoring,
+            "n_models": len(model_functions),
         }
 
-    def calibration_analysis(self,
-                          y_true: np.ndarray,
-                          y_pred_proba: np.ndarray,
-                          n_bins: int = 10) -> Dict[str, Any]:
+    def calibration_analysis(
+        self, y_true: np.ndarray, y_pred_proba: np.ndarray, n_bins: int = 10
+    ) -> dict[str, Any]:
         """Analyze prediction calibration across probability bins.
 
         Args:
@@ -642,15 +682,17 @@ class ModelValidator:
                 in_bin = (y_pred_proba >= bin_lower) & (y_pred_proba <= bin_upper)
 
             if np.sum(in_bin) == 0:
-                calibration_data.append({
-                    'bin': i,
-                    'lower': bin_lower,
-                    'upper': bin_upper,
-                    'count': 0,
-                    'event_rate': 0.0,
-                    'confidence': 0.0,
-                    'ece_contribution': 0.0
-                })
+                calibration_data.append(
+                    {
+                        "bin": i,
+                        "lower": bin_lower,
+                        "upper": bin_upper,
+                        "count": 0,
+                        "event_rate": 0.0,
+                        "confidence": 0.0,
+                        "ece_contribution": 0.0,
+                    }
+                )
                 continue
 
             bin_count = np.sum(in_bin)
@@ -660,51 +702,35 @@ class ModelValidator:
             # Expected calibration error contribution
             ece_contribution = bin_count * abs(bin_event_rate - bin_confidence)
 
-            calibration_data.append({
-                'bin': i,
-                'lower': bin_lower,
-                'upper': bin_upper,
-                'count': int(bin_count),
-                'event_rate': float(bin_event_rate),
-                'confidence': float(bin_confidence),
-                'ece_contribution': float(ece_contribution)
-            })
+            calibration_data.append(
+                {
+                    "bin": i,
+                    "lower": bin_lower,
+                    "upper": bin_upper,
+                    "count": int(bin_count),
+                    "event_rate": float(bin_event_rate),
+                    "confidence": float(bin_confidence),
+                    "ece_contribution": float(ece_contribution),
+                }
+            )
 
         # Calculate overall calibration metrics
         total_samples = len(y_true)
-        ece = sum(item['ece_contribution'] for item in calibration_data) / total_samples
+        ece = sum(item["ece_contribution"] for item in calibration_data) / total_samples
 
         # Maximum calibration error
-        max_calibration_error = max(abs(item['event_rate'] - item['confidence'])
-                                  for item in calibration_data if item['count'] > 0)
+        max_calibration_error = max(
+            abs(item["event_rate"] - item["confidence"])
+            for item in calibration_data
+            if item["count"] > 0
+        )
 
         return {
-            'calibration_bins': calibration_data,
-            'expected_calibration_error': ece,
-            'max_calibration_error': max_calibration_error,
-            'n_bins': n_bins,
-            'total_samples': total_samples,
-            'well_calibrated_threshold': 0.05,  # ECE < 5% considered well-calibrated
-            'is_well_calibrated': ece < 0.05
+            "calibration_bins": calibration_data,
+            "expected_calibration_error": ece,
+            "max_calibration_error": max_calibration_error,
+            "n_bins": n_bins,
+            "total_samples": total_samples,
+            "well_calibrated_threshold": 0.05,  # ECE < 5% considered well-calibrated
+            "is_well_calibrated": ece < 0.05,
         }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

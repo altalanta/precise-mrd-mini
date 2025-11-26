@@ -1,6 +1,5 @@
-
-import os
 from celery import Celery
+
 from .settings import settings
 
 REDIS_URL = settings.REDIS_URL
@@ -16,4 +15,3 @@ celery_app.conf.update(
     task_track_started=True,
     broker_connection_retry_on_startup=True,
 )
-
