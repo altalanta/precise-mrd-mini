@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import pathlib
-from typing import Sequence
+from collections.abc import Sequence
 
 
 def hash_file(path: str | pathlib.Path) -> str:
@@ -47,7 +47,7 @@ def hash_dir(directory: str | pathlib.Path, pattern: str = "*") -> dict[str, str
 
 def write_manifest(
     paths: Sequence[str | pathlib.Path],
-    out_manifest: str | pathlib.Path = "reports/hash_manifest.txt"
+    out_manifest: str | pathlib.Path = "reports/hash_manifest.txt",
 ) -> None:
     """Write hash manifest file for given paths.
 
@@ -82,7 +82,7 @@ def verify_manifest(manifest_path: str | pathlib.Path) -> dict[str, bool]:
     """
     results = {}
 
-    with open(manifest_path, "r") as f:
+    with open(manifest_path) as f:
         for line in f:
             line = line.strip()
             if not line:
@@ -100,7 +100,7 @@ def verify_manifest(manifest_path: str | pathlib.Path) -> dict[str, bool]:
 
             try:
                 actual_hash = hash_file(file_path)
-                results[file_path] = (actual_hash == expected_hash)
+                results[file_path] = actual_hash == expected_hash
             except Exception:
                 results[file_path] = False
 
