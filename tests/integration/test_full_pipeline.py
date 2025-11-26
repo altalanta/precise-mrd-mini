@@ -5,29 +5,27 @@ This module contains end-to-end integration tests that validate the complete
 pipeline functionality across various configurations and scenarios.
 """
 
-import pytest
 import tempfile
-import json
-from pathlib import Path
 from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
-import pandas as pd
+import pytest
 
-from precise_mrd.config import PipelineConfig, load_config
-from precise_mrd.simulate import simulate_reads
-from precise_mrd.collapse import collapse_umis
 from precise_mrd.call import call_mrd
+from precise_mrd.collapse import collapse_umis
+from precise_mrd.config import PipelineConfig
 from precise_mrd.error_model import fit_error_model
 from precise_mrd.metrics import calculate_metrics
 from precise_mrd.reporting import render_report
+from precise_mrd.simulate import simulate_reads
 from precise_mrd.validation import validate_artifacts
-from precise_mrd.determinism_utils import env_fingerprint
 
 
 @dataclass
 class TestScenario:
     """Configuration for a test scenario."""
+
     name: str
     config: dict
     expected_behavior: dict
@@ -54,19 +52,19 @@ class TestFullPipelineIntegration:
                 "allele_fractions": [0.01, 0.001, 0.0001],
                 "umi_depths": [1000, 5000, 10000],
                 "n_replicates": 5,
-                "n_bootstrap": 50
+                "n_bootstrap": 50,
             },
             "umi": {
                 "min_family_size": 3,
                 "max_family_size": 100,
                 "quality_threshold": 20,
-                "consensus_threshold": 0.6
+                "consensus_threshold": 0.6,
             },
             "stats": {
                 "test_type": "poisson",
                 "alpha": 0.05,
-                "fdr_method": "benjamini_hochberg"
-            }
+                "fdr_method": "benjamini_hochberg",
+            },
         }
 
     def test_smoke_test_configuration(self, temp_dir, base_config):
@@ -78,9 +76,9 @@ class TestFullPipelineIntegration:
         results = self._run_full_pipeline(config, output_path)
 
         # Validate results structure
-        assert 'calls_df' in results
-        assert 'metrics' in results
-        assert 'config' in results
+        assert "calls_df" in results
+        assert "metrics" in results
+        assert "config" in results
 
         # Validate artifact contracts
         artifacts_valid = validate_artifacts(output_path)
@@ -99,19 +97,19 @@ class TestFullPipelineIntegration:
                 "allele_fractions": [0.001, 0.0001],
                 "umi_depths": [25000, 50000],
                 "n_replicates": 3,
-                "n_bootstrap": 100
+                "n_bootstrap": 100,
             },
             "umi": {
                 "min_family_size": 2,
                 "max_family_size": 200,
                 "quality_threshold": 30,
-                "consensus_threshold": 0.8
+                "consensus_threshold": 0.8,
             },
             "stats": {
                 "test_type": "binomial",
                 "alpha": 0.01,
-                "fdr_method": "benjamini_hochberg"
-            }
+                "fdr_method": "benjamini_hochberg",
+            },
         }
 
         config = PipelineConfig.from_dict(config_dict)
@@ -120,8 +118,8 @@ class TestFullPipelineIntegration:
         results = self._run_full_pipeline(config, output_path)
 
         # Validate high depth results
-        assert results['calls_df'].shape[0] > 0
-        assert results['metrics']['roc_auc'] > 0.8  # Should have good performance
+        assert results["calls_df"].shape[0] > 0
+        assert results["metrics"]["roc_auc"] > 0.8  # Should have good performance
 
     def test_contamination_scenarios(self, temp_dir):
         """Test pipeline resilience to different contamination levels."""
@@ -129,7 +127,7 @@ class TestFullPipelineIntegration:
             {"name": "no_contamination", "rate": 0.0},
             {"name": "low_contamination", "rate": 0.0001},
             {"name": "moderate_contamination", "rate": 0.001},
-            {"name": "high_contamination", "rate": 0.01}
+            {"name": "high_contamination", "rate": 0.01},
         ]
 
         for scenario in contamination_scenarios:
@@ -140,16 +138,10 @@ class TestFullPipelineIntegration:
                     "allele_fractions": [0.01, 0.001],
                     "umi_depths": [5000],
                     "n_replicates": 5,
-                    "n_bootstrap": 50
+                    "n_bootstrap": 50,
                 },
-                "umi": {
-                    "min_family_size": 3,
-                    "consensus_threshold": 0.6
-                },
-                "stats": {
-                    "test_type": "poisson",
-                    "alpha": 0.05
-                }
+                "umi": {"min_family_size": 3, "consensus_threshold": 0.6},
+                "stats": {"test_type": "poisson", "alpha": 0.05},
             }
 
             config = PipelineConfig.from_dict(config_dict)
@@ -158,9 +150,9 @@ class TestFullPipelineIntegration:
             results = self._run_full_pipeline(config, output_path)
 
             # Validate contamination impact
-            if scenario['rate'] > 0:
+            if scenario["rate"] > 0:
                 # Higher contamination should affect detection performance
-                self._validate_contamination_impact(results, scenario['rate'])
+                self._validate_contamination_impact(results, scenario["rate"])
 
     def test_stratified_analysis_scenarios(self, temp_dir):
         """Test pipeline with different genomic contexts and stratification."""
@@ -168,7 +160,7 @@ class TestFullPipelineIntegration:
         contexts = [
             {"name": "gc_rich", "gc_content": 0.7, "error_rate": 0.001},
             {"name": "at_rich", "gc_content": 0.3, "error_rate": 0.002},
-            {"name": "neutral", "gc_content": 0.5, "error_rate": 0.0015}
+            {"name": "neutral", "gc_content": 0.5, "error_rate": 0.0015},
         ]
 
         for context in contexts:
@@ -179,16 +171,10 @@ class TestFullPipelineIntegration:
                     "allele_fractions": [0.01, 0.001, 0.0001],
                     "umi_depths": [2000, 8000],
                     "n_replicates": 4,
-                    "n_bootstrap": 50
+                    "n_bootstrap": 50,
                 },
-                "umi": {
-                    "min_family_size": 3,
-                    "consensus_threshold": 0.6
-                },
-                "stats": {
-                    "test_type": "poisson",
-                    "alpha": 0.05
-                }
+                "umi": {"min_family_size": 3, "consensus_threshold": 0.6},
+                "stats": {"test_type": "poisson", "alpha": 0.05},
             }
 
             config = PipelineConfig.from_dict(config_dict)
@@ -207,40 +193,34 @@ class TestFullPipelineIntegration:
                 "config": {
                     "allele_fractions": [0.1, 0.01],
                     "umi_depths": [100, 500],
-                    "n_replicates": 2
-                }
+                    "n_replicates": 2,
+                },
             },
             {
                 "name": "extreme_af",
                 "config": {
                     "allele_fractions": [0.5, 0.00001],
                     "umi_depths": [1000],
-                    "n_replicates": 3
-                }
+                    "n_replicates": 3,
+                },
             },
             {
                 "name": "high_replicates",
                 "config": {
                     "allele_fractions": [0.01],
                     "umi_depths": [1000],
-                    "n_replicates": 50
-                }
-            }
+                    "n_replicates": 50,
+                },
+            },
         ]
 
         for case in edge_cases:
             config_dict = {
                 "run_id": f"edge_case_{case['name']}",
                 "seed": 42,
-                **case['config'],
-                "umi": {
-                    "min_family_size": 1,
-                    "consensus_threshold": 0.5
-                },
-                "stats": {
-                    "test_type": "binomial",
-                    "alpha": 0.05
-                }
+                **case["config"],
+                "umi": {"min_family_size": 1, "consensus_threshold": 0.5},
+                "stats": {"test_type": "binomial", "alpha": 0.05},
             }
 
             config = PipelineConfig.from_dict(config_dict)
@@ -260,16 +240,10 @@ class TestFullPipelineIntegration:
                 "allele_fractions": [0.01, 0.001],
                 "umi_depths": [2000, 8000],
                 "n_replicates": 3,
-                "n_bootstrap": 30
+                "n_bootstrap": 30,
             },
-            "umi": {
-                "min_family_size": 3,
-                "consensus_threshold": 0.6
-            },
-            "stats": {
-                "test_type": "poisson",
-                "alpha": 0.05
-            }
+            "umi": {"min_family_size": 3, "consensus_threshold": 0.6},
+            "stats": {"test_type": "poisson", "alpha": 0.05},
         }
 
         config = PipelineConfig.from_dict(config_dict)
@@ -293,7 +267,7 @@ class TestFullPipelineIntegration:
             "metrics.json",
             "auto_report.html",
             "run_context.json",
-            "hash_manifest.txt"
+            "hash_manifest.txt",
         ]
 
         for artifact in required_artifacts:
@@ -335,7 +309,7 @@ class TestFullPipelineIntegration:
             config,
             rng,
             use_ml_calling=False,
-            use_deep_learning=False
+            use_deep_learning=False,
         )
 
         # Step 5: Calculate metrics
@@ -347,66 +321,75 @@ class TestFullPipelineIntegration:
         render_report(calls_df, metrics, config, output_path=str(output_path))
 
         return {
-            'reads_df': reads_df,
-            'collapsed_df': collapsed_df,
-            'error_model': error_model,
-            'calls_df': calls_df,
-            'metrics': metrics,
-            'config': config,
-            'output_path': output_path
+            "reads_df": reads_df,
+            "collapsed_df": collapsed_df,
+            "error_model": error_model,
+            "calls_df": calls_df,
+            "metrics": metrics,
+            "config": config,
+            "output_path": output_path,
         }
 
     def _assert_deterministic_results(self, results1: dict, results2: dict):
         """Assert that two pipeline runs produced identical results."""
         # Compare key metrics
-        metrics1 = results1['metrics']
-        metrics2 = results2['metrics']
+        metrics1 = results1["metrics"]
+        metrics2 = results2["metrics"]
 
-        assert metrics1['roc_auc'] == metrics2['roc_auc'], "ROC AUC differs between runs"
-        assert metrics1['average_precision'] == metrics2['average_precision'], "AP differs between runs"
+        assert metrics1["roc_auc"] == metrics2["roc_auc"], (
+            "ROC AUC differs between runs"
+        )
+        assert metrics1["average_precision"] == metrics2["average_precision"], (
+            "AP differs between runs"
+        )
 
         # Compare call results (key columns)
-        calls1 = results1['calls_df']
-        calls2 = results2['calls_df']
+        calls1 = results1["calls_df"]
+        calls2 = results2["calls_df"]
 
         assert len(calls1) == len(calls2), "Different number of calls between runs"
 
         # Check specific columns that should be deterministic
-        deterministic_cols = ['sample_id', 'is_variant', 'p_value', 'p_adjusted']
+        deterministic_cols = ["sample_id", "is_variant", "p_value", "p_adjusted"]
         for col in deterministic_cols:
             if col in calls1.columns:
-                assert (calls1[col] == calls2[col]).all(), f"Column {col} differs between runs"
+                assert (calls1[col] == calls2[col]).all(), (
+                    f"Column {col} differs between runs"
+                )
 
     def _validate_contamination_impact(self, results: dict, contamination_rate: float):
         """Validate that contamination affects results as expected."""
-        metrics = results['metrics']
-        calls_df = results['calls_df']
+        calls_df = results["calls_df"]
 
         # Higher contamination should generally decrease performance
         if contamination_rate > 0.001:
             # Should still detect high AF variants
-            high_af_calls = calls_df[calls_df['allele_fraction'] >= 0.01]
-            assert len(high_af_calls) > 0, "Should detect high AF variants even with contamination"
+            high_af_calls = calls_df[calls_df["allele_fraction"] >= 0.01]
+            assert len(high_af_calls) > 0, (
+                "Should detect high AF variants even with contamination"
+            )
 
     def _validate_stratified_results(self, results: dict, context: dict):
         """Validate stratified analysis results."""
-        calls_df = results['calls_df']
+        calls_df = results["calls_df"]
 
         # Should have calls across different allele fractions and depths
-        unique_afs = calls_df['allele_fraction'].unique()
-        unique_depths = calls_df['umi_depth'].unique()
+        unique_afs = calls_df["allele_fraction"].unique()
+        unique_depths = calls_df["umi_depth"].unique()
 
         assert len(unique_afs) > 1, "Should test multiple allele fractions"
         assert len(unique_depths) > 1, "Should test multiple depths"
 
     def _validate_edge_case_results(self, results: dict, case: dict):
         """Validate edge case behavior."""
-        calls_df = results['calls_df']
+        calls_df = results["calls_df"]
 
         # Should still produce valid results even with edge case parameters
         assert len(calls_df) > 0, "Should produce some calls even in edge cases"
-        assert calls_df['p_value'].notna().all(), "All p-values should be valid"
-        assert (calls_df['p_value'] >= 0).all() and (calls_df['p_value'] <= 1).all(), "P-values should be in [0,1]"
+        assert calls_df["p_value"].notna().all(), "All p-values should be valid"
+        assert (calls_df["p_value"] >= 0).all() and (calls_df["p_value"] <= 1).all(), (
+            "P-values should be in [0,1]"
+        )
 
 
 @pytest.mark.integration
@@ -418,16 +401,14 @@ class TestPipelineRobustness:
         invalid_configs = [
             # Invalid allele fractions
             {"allele_fractions": [-0.1, 0.001]},  # Negative AF
-            {"allele_fractions": [0.001, 1.5]},   # AF > 1
-            {"allele_fractions": []},             # Empty AF list
-
+            {"allele_fractions": [0.001, 1.5]},  # AF > 1
+            {"allele_fractions": []},  # Empty AF list
             # Invalid depths
-            {"umi_depths": [0, 1000]},            # Zero depth
-            {"umi_depths": [-100, 1000]},         # Negative depth
-
+            {"umi_depths": [0, 1000]},  # Zero depth
+            {"umi_depths": [-100, 1000]},  # Negative depth
             # Invalid replicates
-            {"n_replicates": 0},                  # Zero replicates
-            {"n_replicates": -1},                 # Negative replicates
+            {"n_replicates": 0},  # Zero replicates
+            {"n_replicates": -1},  # Negative replicates
         ]
 
         for invalid_config in invalid_configs:
@@ -437,7 +418,7 @@ class TestPipelineRobustness:
                     "seed": 42,
                     "simulation": invalid_config,
                     "umi": {"min_family_size": 3, "consensus_threshold": 0.6},
-                    "stats": {"test_type": "poisson", "alpha": 0.05}
+                    "stats": {"test_type": "poisson", "alpha": 0.05},
                 }
                 PipelineConfig.from_dict(config_dict)
 
@@ -449,20 +430,18 @@ class TestPipelineRobustness:
             "simulation": {
                 "allele_fractions": [0.01],
                 "umi_depths": [1000],
-                "n_replicates": 1
+                "n_replicates": 1,
             },
             "umi": {"min_family_size": 3, "consensus_threshold": 0.6},
-            "stats": {"test_type": "poisson", "alpha": 0.05}
+            "stats": {"test_type": "poisson", "alpha": 0.05},
         }
 
         config = PipelineConfig.from_dict(config_dict)
 
         # This should handle missing intermediate files gracefully
-        with pytest.raises(Exception):  # Should fail but not crash
+        with pytest.raises(FileNotFoundError):  # Should fail but not crash
             # Try to run pipeline without proper setup
-            from precise_mrd.call import call_mrd
-            # This should fail gracefully rather than crash
-            pass
+            _ = self._run_full_pipeline(config, temp_dir / "missing_files_run")
 
 
 @pytest.mark.integration
@@ -485,7 +464,7 @@ class TestPerformanceRegression:
                 "seed": 42,
                 **config_params,
                 "umi": {"min_family_size": 3, "consensus_threshold": 0.6},
-                "stats": {"test_type": "poisson", "alpha": 0.05}
+                "stats": {"test_type": "poisson", "alpha": 0.05},
             }
 
             config = PipelineConfig.from_dict(config_dict)
@@ -499,19 +478,29 @@ class TestPerformanceRegression:
 
     def _validate_performance_trends(self, results: list, configurations: list):
         """Validate that performance changes as expected with configuration changes."""
-        metrics = [r['metrics'] for r in results]
+        metrics = [r["metrics"] for r in results]
 
         # More replicates should improve precision
-        rep5_idx = next(i for i, c in enumerate(configurations) if c['n_replicates'] == 5)
-        rep10_idx = next(i for i, c in enumerate(configurations) if c['n_replicates'] == 10)
+        rep5_idx = next(
+            i for i, c in enumerate(configurations) if c["n_replicates"] == 5
+        )
+        rep10_idx = next(
+            i for i, c in enumerate(configurations) if c["n_replicates"] == 10
+        )
 
         # Higher replicates should have similar or better performance
-        assert metrics[rep10_idx]['roc_auc'] >= metrics[rep5_idx]['roc_auc'] * 0.95
+        assert metrics[rep10_idx]["roc_auc"] >= metrics[rep5_idx]["roc_auc"] * 0.95
 
         # Higher depth should improve sensitivity
-        depth1k_idx = next(i for i, c in enumerate(configurations) if 1000 in c['umi_depths'])
-        depth5k_idx = next(i for i, c in enumerate(configurations) if 5000 in c['umi_depths'])
+        depth1k_idx = next(
+            i for i, c in enumerate(configurations) if 1000 in c["umi_depths"]
+        )
+        depth5k_idx = next(
+            i for i, c in enumerate(configurations) if 5000 in c["umi_depths"]
+        )
 
         if depth5k_idx != depth1k_idx:
             # Higher depth should generally improve performance
-            assert metrics[depth5k_idx]['roc_auc'] >= metrics[depth1k_idx]['roc_auc'] * 0.9
+            assert (
+                metrics[depth5k_idx]["roc_auc"] >= metrics[depth1k_idx]["roc_auc"] * 0.9
+            )

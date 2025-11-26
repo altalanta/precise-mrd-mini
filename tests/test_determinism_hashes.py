@@ -10,7 +10,10 @@ from precise_mrd.validation import assert_hashes_stable
 
 
 def _write_manifest(path: Path, entries: dict[str, str]) -> None:
-    path.write_text("\n".join(f"{value}  {key}" for key, value in entries.items()) + "\n", encoding="utf-8")
+    path.write_text(
+        "\n".join(f"{value}  {key}" for key, value in entries.items()) + "\n",
+        encoding="utf-8",
+    )
 
 
 def test_assert_hashes_stable_pass(tmp_path: Path) -> None:
