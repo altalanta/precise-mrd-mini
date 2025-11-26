@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import subprocess
-import pandas as pd
-import yaml
-import hashlib
 from pathlib import Path
+
+import pandas as pd
 import pkg_resources
-from typing import Dict, Any, List
+import yaml
 
 
 class PipelineIO:
@@ -37,25 +37,25 @@ class PipelineIO:
     @staticmethod
     def save_json(data: dict, path: str):
         """Save a dictionary to a JSON file."""
-        with open(path, 'w') as f:
+        with open(path, "w") as f:
             json.dump(data, f, indent=4)
 
     @staticmethod
     def load_json(path: str) -> dict:
         """Load a dictionary from a JSON file."""
-        with open(path, 'r') as f:
+        with open(path) as f:
             return json.load(f)
 
     @staticmethod
     def save_yaml(data: dict, path: str):
         """Save a dictionary to a YAML file."""
-        with open(path, 'w') as f:
+        with open(path, "w") as f:
             yaml.dump(data, f, default_flow_style=False)
 
     @staticmethod
     def load_yaml(path: str) -> dict:
         """Load a dictionary from a YAML file."""
-        with open(path, 'r') as f:
+        with open(path) as f:
             return yaml.safe_load(f)
 
     @staticmethod
@@ -66,7 +66,7 @@ class PipelineIO:
         return path_obj
 
 
-def validate_repository_state() -> List[str]:
+def validate_repository_state() -> list[str]:
     """Validate that git repository is in a consistent state.
 
     Returns:
@@ -78,9 +78,16 @@ def validate_repository_state() -> List[str]:
     try:
         result = subprocess.run(
             ["git", "rev-parse", "--git-dir"],
-            capture_output=True, text=True, check=True, timeout=5
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=5,
         )
-    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
+    except (
+        subprocess.CalledProcessError,
+        subprocess.TimeoutExpired,
+        FileNotFoundError,
+    ):
         errors.append("Not in a git repository or git not available")
         return errors
 
@@ -88,17 +95,25 @@ def validate_repository_state() -> List[str]:
     try:
         result = subprocess.run(
             ["git", "status", "--porcelain"],
-            capture_output=True, text=True, check=True, timeout=5
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=5,
         )
         if result.stdout.strip():
             # Only warn about source code changes, not generated files
-            lines = result.stdout.strip().split('\n')
+            lines = result.stdout.strip().split("\n")
             source_changes = [
-                line for line in lines
-                if not any(path in line for path in ['data/', 'reports/', '.snakemake/'])
+                line
+                for line in lines
+                if not any(
+                    path in line for path in ["data/", "reports/", ".snakemake/"]
+                )
             ]
             if source_changes:
-                errors.append(f"Repository has uncommitted source changes: {source_changes}")
+                errors.append(
+                    f"Repository has uncommitted source changes: {source_changes}"
+                )
     except Exception as e:
         errors.append(f"Could not check git status: {e}")
 
