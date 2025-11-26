@@ -2,31 +2,31 @@
 
 from __future__ import annotations
 
-import pandas as pd
-import numpy as np
 import hashlib
 import json
 from pathlib import Path
-from typing import Optional, Dict, Any
+
+import numpy as np
+import pandas as pd
 import pandera as pa
 
-from .config import PipelineConfig
 from .advanced_stats import BayesianErrorModel
-from .data_schemas import ErrorModelSchema, CollapsedUmisSchema
+from .config import PipelineConfig
+from .data_schemas import CollapsedUmisSchema, ErrorModelSchema
 
 
 def _get_cache_key(config: PipelineConfig, collapsed_df: pd.DataFrame) -> str:
     """Generate a cache key based on configuration and data characteristics."""
     # Create a deterministic representation of the configuration and data
-    config_dict = config.to_dict() if hasattr(config, 'to_dict') else config.__dict__
+    config_dict = config.to_dict() if hasattr(config, "to_dict") else config.__dict__
 
     # Include key data characteristics that affect error model
     data_summary = {
-        'n_samples': len(collapsed_df),
-        'mean_af': collapsed_df['allele_fraction'].mean(),
-        'min_af': collapsed_df['allele_fraction'].min(),
-        'max_af': collapsed_df['allele_fraction'].max(),
-        'config_hash': config.config_hash(),
+        "n_samples": len(collapsed_df),
+        "mean_af": collapsed_df["allele_fraction"].mean(),
+        "min_af": collapsed_df["allele_fraction"].min(),
+        "max_af": collapsed_df["allele_fraction"].max(),
+        "config_hash": config.config_hash(),
     }
 
     # Create deterministic string representation
@@ -34,7 +34,9 @@ def _get_cache_key(config: PipelineConfig, collapsed_df: pd.DataFrame) -> str:
     return hashlib.sha256(cache_input.encode()).hexdigest()[:16]
 
 
-def _load_cached_error_model(cache_key: str, cache_dir: str = ".cache") -> Optional[pd.DataFrame]:
+def _load_cached_error_model(
+    cache_key: str, cache_dir: str = ".cache"
+) -> pd.DataFrame | None:
     """Load cached error model if it exists."""
     cache_path = Path(cache_dir) / f"error_model_{cache_key}.parquet"
     if cache_path.exists():
@@ -45,24 +47,27 @@ def _load_cached_error_model(cache_key: str, cache_dir: str = ".cache") -> Optio
     return None
 
 
-def _save_cached_error_model(error_df: pd.DataFrame, cache_key: str, cache_dir: str = ".cache") -> None:
+def _save_cached_error_model(
+    error_df: pd.DataFrame, cache_key: str, cache_dir: str = ".cache"
+) -> None:
     """Save error model to cache."""
     cache_path = Path(cache_dir) / f"error_model_{cache_key}.parquet"
     cache_path.parent.mkdir(parents=True, exist_ok=True)
     error_df.to_parquet(cache_path, index=False)
 
 
-@pa.check_input(pa.DataFrameSchema(CollapsedUmisSchema.to_schema().columns,
-                                 strict=False))
+@pa.check_input(
+    pa.DataFrameSchema(CollapsedUmisSchema.to_schema().columns, strict=False)
+)
 @pa.check_output(ErrorModelSchema)
 def fit_error_model(
     collapsed_df: pd.DataFrame,
     config: PipelineConfig,
     rng: np.random.Generator,
-    output_path: Optional[str] = None,
+    output_path: str | None = None,
     use_cache: bool = True,
     cache_dir: str = ".cache",
-    use_advanced_stats: bool = False
+    use_advanced_stats: bool = False,
 ) -> pd.DataFrame:
     """Fit trinucleotide context-specific error model with optional caching and advanced statistics.
 
@@ -97,16 +102,18 @@ def fit_error_model(
 
         # Convert to DataFrame format for compatibility
         error_data = []
-        for context, params in advanced_results['context_error_rates'].items():
-            error_data.append({
-                'trinucleotide_context': context,
-                'error_rate': params['error_rate'],
-                'ci_lower': params['ci_lower'],
-                'ci_upper': params['ci_upper'],
-                'n_observations': params['n_observations'],
-                'model_type': 'bayesian',
-                'config_hash': params.get('config_hash', config.config_hash())
-            })
+        for context, params in advanced_results["context_error_rates"].items():
+            error_data.append(
+                {
+                    "trinucleotide_context": context,
+                    "error_rate": params["error_rate"],
+                    "ci_lower": params["ci_lower"],
+                    "ci_upper": params["ci_upper"],
+                    "n_observations": params["n_observations"],
+                    "model_type": "bayesian",
+                    "config_hash": params.get("config_hash", config.config_hash()),
+                }
+            )
 
         df = pd.DataFrame(error_data)
 
@@ -123,22 +130,70 @@ def fit_error_model(
 
     # Define trinucleotide contexts
     contexts = [
-        'AAA', 'AAC', 'AAG', 'AAT',
-        'ACA', 'ACC', 'ACG', 'ACT',
-        'AGA', 'AGC', 'AGG', 'AGT',
-        'ATA', 'ATC', 'ATG', 'ATT',
-        'CAA', 'CAC', 'CAG', 'CAT',
-        'CCA', 'CCC', 'CCG', 'CCT',
-        'CGA', 'CGC', 'CGG', 'CGT',
-        'CTA', 'CTC', 'CTG', 'CTT',
-        'GAA', 'GAC', 'GAG', 'GAT',
-        'GCA', 'GCC', 'GCG', 'GCT',
-        'GGA', 'GGC', 'GGG', 'GGT',
-        'GTA', 'GTC', 'GTG', 'GTT',
-        'TAA', 'TAC', 'TAG', 'TAT',
-        'TCA', 'TCC', 'TCG', 'TCT',
-        'TGA', 'TGC', 'TGG', 'TGT',
-        'TTA', 'TTC', 'TTG', 'TTT'
+        "AAA",
+        "AAC",
+        "AAG",
+        "AAT",
+        "ACA",
+        "ACC",
+        "ACG",
+        "ACT",
+        "AGA",
+        "AGC",
+        "AGG",
+        "AGT",
+        "ATA",
+        "ATC",
+        "ATG",
+        "ATT",
+        "CAA",
+        "CAC",
+        "CAG",
+        "CAT",
+        "CCA",
+        "CCC",
+        "CCG",
+        "CCT",
+        "CGA",
+        "CGC",
+        "CGG",
+        "CGT",
+        "CTA",
+        "CTC",
+        "CTG",
+        "CTT",
+        "GAA",
+        "GAC",
+        "GAG",
+        "GAT",
+        "GCA",
+        "GCC",
+        "GCG",
+        "GCT",
+        "GGA",
+        "GGC",
+        "GGG",
+        "GGT",
+        "GTA",
+        "GTC",
+        "GTG",
+        "GTT",
+        "TAA",
+        "TAC",
+        "TAG",
+        "TAT",
+        "TCA",
+        "TCC",
+        "TCG",
+        "TCT",
+        "TGA",
+        "TGC",
+        "TGG",
+        "TGT",
+        "TTA",
+        "TTC",
+        "TTG",
+        "TTT",
     ]
 
     # Fit error rates for each trinucleotide context
@@ -146,16 +201,16 @@ def fit_error_model(
 
     for context in contexts:
         # Estimate error rate from negative control samples (lowest AF)
-        negative_samples = collapsed_df[collapsed_df['allele_fraction'] <= 0.0001]
+        negative_samples = collapsed_df[collapsed_df["allele_fraction"] <= 0.0001]
 
         if len(negative_samples) == 0:
             # Fallback to lowest AF samples
-            min_af = collapsed_df['allele_fraction'].min()
-            negative_samples = collapsed_df[collapsed_df['allele_fraction'] == min_af]
+            min_af = collapsed_df["allele_fraction"].min()
+            negative_samples = collapsed_df[collapsed_df["allele_fraction"] == min_af]
 
         # Count variants in negative samples for this context
         if len(negative_samples) > 0:
-            variant_rate = negative_samples['is_variant'].mean()
+            variant_rate = negative_samples["is_variant"].mean()
             # Add context-specific variation
             context_modifier = rng.uniform(0.5, 2.0)
             error_rate = variant_rate * context_modifier
@@ -170,9 +225,9 @@ def fit_error_model(
                 boot_sample = negative_samples.sample(
                     n=len(negative_samples),
                     replace=True,
-                    random_state=rng.integers(0, 2**32-1)
+                    random_state=rng.integers(0, 2**32 - 1),
                 )
-                boot_rate = boot_sample['is_variant'].mean() * context_modifier
+                boot_rate = boot_sample["is_variant"].mean() * context_modifier
                 bootstrap_rates.append(boot_rate)
 
             ci_lower = np.percentile(bootstrap_rates, 2.5)
@@ -181,14 +236,16 @@ def fit_error_model(
             ci_lower = error_rate * 0.5
             ci_upper = error_rate * 2.0
 
-        error_data.append({
-            'trinucleotide_context': context,
-            'error_rate': error_rate,
-            'ci_lower': ci_lower,
-            'ci_upper': ci_upper,
-            'n_observations': len(negative_samples),
-            'config_hash': config.config_hash(),
-        })
+        error_data.append(
+            {
+                "trinucleotide_context": context,
+                "error_rate": error_rate,
+                "ci_lower": ci_lower,
+                "ci_upper": ci_upper,
+                "n_observations": len(negative_samples),
+                "config_hash": config.config_hash(),
+            }
+        )
 
     df = pd.DataFrame(error_data)
 
