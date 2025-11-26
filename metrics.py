@@ -2,17 +2,23 @@
 
 from __future__ import annotations
 
-import numpy as np
-import pandas as pd
-from sklearn.metrics import roc_auc_score as sklearn_roc_auc
-from sklearn.metrics import average_precision_score as sklearn_ap
-from typing import Dict, Any, Optional, Tuple
 import multiprocessing as mp
 from concurrent.futures import ProcessPoolExecutor, as_completed
+from typing import Any
 
-from .config import PipelineConfig
+import numpy as np
+import pandas as pd
+from sklearn.metrics import average_precision_score as sklearn_ap
+from sklearn.metrics import roc_auc_score as sklearn_roc_auc
+
 from .advanced_stats import AdvancedConfidenceIntervals
-from .statistical_validation import CrossValidator, UncertaintyQuantifier, StatisticalTester, RobustnessAnalyzer, ModelValidator
+from .config import PipelineConfig
+from .statistical_validation import (
+    CrossValidator,
+    ModelValidator,
+    RobustnessAnalyzer,
+    UncertaintyQuantifier,
+)
 
 
 def roc_auc_score(y_true: np.ndarray, y_score: np.ndarray) -> float:
@@ -50,9 +56,9 @@ def bootstrap_metric(
     y_score: np.ndarray,
     metric_func,
     n_bootstrap: int = 1000,
-    rng: Optional[np.random.Generator] = None,
-    n_jobs: int = -1
-) -> Dict[str, float]:
+    rng: np.random.Generator | None = None,
+    n_jobs: int = -1,
+) -> dict[str, float]:
     """Bootstrap confidence intervals for a metric with parallel processing.
 
     Args:
@@ -74,8 +80,7 @@ def bootstrap_metric(
 
     # Generate all bootstrap indices upfront
     bootstrap_indices = [
-        rng.choice(n_samples, size=n_samples, replace=True)
-        for _ in range(n_bootstrap)
+        rng.choice(n_samples, size=n_samples, replace=True) for _ in range(n_bootstrap)
     ]
 
     # Parallel computation
@@ -91,7 +96,9 @@ def bootstrap_metric(
         with ProcessPoolExecutor(max_workers=n_jobs) as executor:
             # Submit all tasks and maintain deterministic order
             future_to_indices = {
-                executor.submit(_bootstrap_worker, (y_true, y_score, indices, metric_func)): i
+                executor.submit(
+                    _bootstrap_worker, (y_true, y_score, indices, metric_func)
+                ): i
                 for i, indices in enumerate(bootstrap_indices)
             }
 
@@ -114,15 +121,13 @@ def bootstrap_metric(
         "mean": np.mean(bootstrap_scores),
         "lower": np.percentile(bootstrap_scores, 2.5),
         "upper": np.percentile(bootstrap_scores, 97.5),
-        "std": np.std(bootstrap_scores)
+        "std": np.std(bootstrap_scores),
     }
 
 
 def calibration_analysis(
-    y_true: np.ndarray,
-    y_prob: np.ndarray,
-    n_bins: int = 10
-) -> list[Dict[str, Any]]:
+    y_true: np.ndarray, y_prob: np.ndarray, n_bins: int = 10
+) -> list[dict[str, Any]]:
     """Analyze prediction calibration.
 
     Args:
@@ -153,14 +158,16 @@ def calibration_analysis(
         bin_event_rate = np.mean(y_true[in_bin])
         bin_confidence = np.mean(y_prob[in_bin])
 
-        calibration_data.append({
-            "bin": i,
-            "lower": bin_lower,
-            "upper": bin_upper,
-            "count": int(bin_count),
-            "event_rate": float(bin_event_rate),
-            "confidence": float(bin_confidence)
-        })
+        calibration_data.append(
+            {
+                "bin": i,
+                "lower": bin_lower,
+                "upper": bin_upper,
+                "count": int(bin_count),
+                "event_rate": float(bin_event_rate),
+                "confidence": float(bin_confidence),
+            }
+        )
 
     return calibration_data
 
@@ -170,10 +177,10 @@ def calculate_metrics(
     rng: np.random.Generator,
     n_bootstrap: int = 1000,
     n_jobs: int = -1,
-    config: Optional[PipelineConfig] = None,
+    config: PipelineConfig | None = None,
     use_advanced_ci: bool = False,
-    run_validation: bool = False
-) -> Dict[str, Any]:
+    run_validation: bool = False,
+) -> dict[str, Any]:
     """Calculate comprehensive performance metrics with optional advanced confidence intervals and validation.
 
     Args:
@@ -194,12 +201,12 @@ def calculate_metrics(
             "average_precision": 0.0,
             "detected_cases": 0,
             "total_cases": 0,
-            "calibration": []
+            "calibration": [],
         }
 
     # Define truth labels (high AF = positive case)
-    if 'allele_fraction' in calls_df.columns:
-        y_true = (calls_df['allele_fraction'] > 0.001).astype(int)
+    if "allele_fraction" in calls_df.columns:
+        y_true = (calls_df["allele_fraction"] > 0.001).astype(int)
     else:
         # For real data or ML-based calling, we don't have ground truth
         # Use a default approach or skip certain metrics
@@ -207,14 +214,14 @@ def calculate_metrics(
         y_true = np.zeros(len(calls_df))  # All negative for compatibility
 
     # Use variant fraction as prediction score
-    if 'variant_fraction' in calls_df.columns:
-        y_score = calls_df['variant_fraction'].values
-    elif 'ml_probability' in calls_df.columns:
-        y_score = calls_df['ml_probability'].values
+    if "variant_fraction" in calls_df.columns:
+        y_score = calls_df["variant_fraction"].values
+    elif "ml_probability" in calls_df.columns:
+        y_score = calls_df["ml_probability"].values
     else:
         # Fallback to p-value if available
-        if 'p_value' in calls_df.columns:
-            y_score = 1.0 - calls_df['p_value'].values  # Convert p-value to score
+        if "p_value" in calls_df.columns:
+            y_score = 1.0 - calls_df["p_value"].values  # Convert p-value to score
         else:
             y_score = np.random.random(len(calls_df))  # Random fallback
 
@@ -238,21 +245,25 @@ def calculate_metrics(
         )
 
         # Add method information
-        roc_ci['method'] = 'advanced_bootstrap'
-        ap_ci['method'] = 'advanced_bootstrap'
+        roc_ci["method"] = "advanced_bootstrap"
+        ap_ci["method"] = "advanced_bootstrap"
     else:
         # Standard bootstrap CI (parallel processing)
-        roc_ci = bootstrap_metric(y_true, y_score, roc_auc_score, n_bootstrap, rng, n_jobs)
-        ap_ci = bootstrap_metric(y_true, y_score, average_precision, n_bootstrap, rng, n_jobs)
+        roc_ci = bootstrap_metric(
+            y_true, y_score, roc_auc_score, n_bootstrap, rng, n_jobs
+        )
+        ap_ci = bootstrap_metric(
+            y_true, y_score, average_precision, n_bootstrap, rng, n_jobs
+        )
 
     # Detection statistics
-    if 'significant' in calls_df.columns:
-        if 'allele_fraction' in calls_df.columns:
-            detected_cases = int(np.sum(calls_df['significant'] & (y_true == 1)))
+    if "significant" in calls_df.columns:
+        if "allele_fraction" in calls_df.columns:
+            detected_cases = int(np.sum(calls_df["significant"] & (y_true == 1)))
             total_cases = int(np.sum(y_true))
         else:
             # For real data, just count significant calls
-            detected_cases = int(np.sum(calls_df['significant']))
+            detected_cases = int(np.sum(calls_df["significant"]))
             total_cases = len(calls_df)  # All samples are "cases" in real data context
     else:
         detected_cases = 0
@@ -270,38 +281,43 @@ def calculate_metrics(
         print("  Running comprehensive statistical validation...")
 
         # Cross-validation for model performance
-        if 'ml_probability' in calls_df.columns:
-            X = calls_df[['family_size', 'quality_score', 'consensus_agreement']].values
-            y = calls_df['is_variant'].values
+        if "ml_probability" in calls_df.columns:
+            X = calls_df[["family_size", "quality_score", "consensus_agreement"]].values
+            y = calls_df["is_variant"].values
 
             # Simple model function for demonstration
             def simple_model_func(X_train, y_train):
                 from sklearn.ensemble import RandomForestClassifier
-                model = RandomForestClassifier(n_estimators=10, random_state=config.seed)
+
+                model = RandomForestClassifier(
+                    n_estimators=10, random_state=config.seed
+                )
                 model.fit(X_train, y_train)
                 return model
 
             cv = CrossValidator(config)
             cv_results = cv.k_fold_cross_validation(X, y, simple_model_func, k_folds=3)
-            validation_results['cross_validation'] = cv_results
+            validation_results["cross_validation"] = cv_results
 
         # Calibration analysis
-        if 'ml_probability' in calls_df.columns:
+        if "ml_probability" in calls_df.columns:
             calibrator = ModelValidator(config)
-            calibration_results = calibrator.calibration_analysis(y_true, calls_df['ml_probability'].values)
-            validation_results['calibration_analysis'] = calibration_results
+            calibration_results = calibrator.calibration_analysis(
+                y_true, calls_df["ml_probability"].values
+            )
+            validation_results["calibration_analysis"] = calibration_results
 
         # Robustness analysis
         robustness = RobustnessAnalyzer(config)
         robustness_results = robustness.bootstrap_robustness(calls_df, n_bootstrap=50)
-        validation_results['robustness_analysis'] = robustness_results
+        validation_results["robustness_analysis"] = robustness_results
 
         # Uncertainty quantification
         uncertainty = UncertaintyQuantifier(config)
         # Example: quantify uncertainty in variant rate estimates
-        variant_rates = calls_df['is_variant'].values
+        variant_rates = calls_df["is_variant"].values
         uncertainty_results = uncertainty.bayesian_uncertainty([variant_rates])
-        validation_results['uncertainty_quantification'] = uncertainty_results
+        validation_results["uncertainty_quantification"] = uncertainty_results
 
     return {
         "roc_auc": float(roc_auc),
@@ -312,5 +328,5 @@ def calculate_metrics(
         "detected_cases": detected_cases,
         "total_cases": total_cases,
         "calibration": calibration,
-        "statistical_validation": validation_results if validation_results else None
+        "statistical_validation": validation_results if validation_results else None,
     }

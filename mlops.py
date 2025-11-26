@@ -1,15 +1,18 @@
 """
 Utilities for MLOps, focusing on MLflow experiment tracking.
 """
-import mlflow
-from pathlib import Path
-from typing import Dict, Any
+
 import json
+from pathlib import Path
+from typing import Any
+
+import mlflow
 
 from .logging_config import get_logger
 from .settings import settings
 
 log = get_logger(__name__)
+
 
 def setup_mlflow():
     """
@@ -19,22 +22,25 @@ def setup_mlflow():
     experiment_name = settings.MLFLOW_EXPERIMENT_NAME
 
     # Handle local file paths correctly
-    if not tracking_uri.startswith(('http', 'file:', 'sqlite:')):
+    if not tracking_uri.startswith(("http", "file:", "sqlite:")):
         tracking_uri_path = Path(tracking_uri).resolve()
         tracking_uri_path.mkdir(parents=True, exist_ok=True)
         mlflow.set_tracking_uri(tracking_uri_path.as_uri())
     else:
         mlflow.set_tracking_uri(tracking_uri)
-    
+
     mlflow.set_experiment(experiment_name)
-    log.info(f"MLflow tracking enabled. URI: '{mlflow.get_tracking_uri()}', Experiment: '{experiment_name}'")
+    log.info(
+        f"MLflow tracking enabled. URI: '{mlflow.get_tracking_uri()}', Experiment: '{experiment_name}'"
+    )
+
 
 def log_pipeline_run(
-    run_name: str, 
-    params: Dict[str, Any], 
-    metrics_path: Path, 
+    run_name: str,
+    params: dict[str, Any],
+    metrics_path: Path,
     artifacts_dir: Path,
-    tags: Dict[str, str] = None
+    tags: dict[str, str] = None,
 ):
     """
     Logs a complete pipeline run to MLflow, including parameters, metrics, and all artifacts.
@@ -48,41 +54,42 @@ def log_pipeline_run(
     """
     with mlflow.start_run(run_name=run_name) as run:
         log.info(f"Starting MLflow run: {run.info.run_name} ({run.info.run_id})")
-        
+
         # Log parameters
         mlflow.log_params(params)
-        
+
         # Set tags
         if tags:
             mlflow.set_tags(tags)
-            
+
         # Log metrics from metrics.json
         if metrics_path.exists():
-            with open(metrics_path, 'r') as f:
+            with open(metrics_path) as f:
                 metrics_data = json.load(f)
-            
+
             # Log overall metrics and metrics per allele fraction
-            if 'overall' in metrics_data:
-                mlflow.log_metrics(metrics_data['overall'])
-            if 'per_af' in metrics_data:
+            if "overall" in metrics_data:
+                mlflow.log_metrics(metrics_data["overall"])
+            if "per_af" in metrics_data:
                 # MLflow prefers flat key-value pairs
-                for af_metrics in metrics_data['per_af']:
+                for af_metrics in metrics_data["per_af"]:
                     af = af_metrics.get("allele_fraction", "unknown_af")
                     for key, value in af_metrics.items():
                         if key != "allele_fraction" and isinstance(value, (int, float)):
                             mlflow.log_metric(f"af_{af}_{key}", value)
         else:
-            log.warning(f"Metrics file not found at {metrics_path}, skipping metric logging.")
-            
+            log.warning(
+                f"Metrics file not found at {metrics_path}, skipping metric logging."
+            )
+
         # Log all artifacts from the output directory
         if artifacts_dir.is_dir():
             mlflow.log_artifacts(str(artifacts_dir), artifact_path="results")
             log.info(f"Logged artifacts from directory: {artifacts_dir}")
         else:
-            log.warning(f"Artifacts directory not found at {artifacts_dir}, skipping artifact logging.")
-            
+            log.warning(
+                f"Artifacts directory not found at {artifacts_dir}, skipping artifact logging."
+            )
+
         log.info(f"Completed MLflow run: {run.info.run_name}")
         return run.info.run_id
-
-
-
