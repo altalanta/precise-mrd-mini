@@ -6,10 +6,10 @@ import copy
 import hashlib
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any
+from typing import Any, Self
 
 import yaml
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from .exceptions import ConfigurationError
 
@@ -22,8 +22,9 @@ class SimulationConfig(BaseModel):
     n_replicates: int
     n_bootstrap: int
 
-    @validator("allele_fractions")
-    def validate_allele_fractions(cls, v):
+    @field_validator("allele_fractions")
+    @classmethod
+    def validate_allele_fractions(cls, v: list[float]) -> list[float]:
         if not v:
             raise ConfigurationError("allele_fractions cannot be empty")
         if any(af < 0 or af > 1 for af in v):
@@ -76,29 +77,33 @@ class UMIConfig(BaseModel):
     quality_threshold: int
     consensus_threshold: float
 
-    @validator("min_family_size")
-    def validate_min_family_size(cls, v):
+    @field_validator("min_family_size")
+    @classmethod
+    def validate_min_family_size(cls, v: int) -> int:
         if v <= 0:
             raise ConfigurationError("min_family_size must be positive")
         return v
 
-    @validator("max_family_size")
-    def validate_max_family_size(cls, v, values):
-        if "min_family_size" in values and v < values["min_family_size"]:
-            raise ConfigurationError("max_family_size must be >= min_family_size")
-        return v
-
-    @validator("quality_threshold")
-    def validate_quality_threshold(cls, v):
+    @field_validator("quality_threshold")
+    @classmethod
+    def validate_quality_threshold(cls, v: int) -> int:
         if not 0 <= v <= 60:
             raise ConfigurationError("quality_threshold must be between 0 and 60")
         return v
 
-    @validator("consensus_threshold")
-    def validate_consensus_threshold(cls, v):
+    @field_validator("consensus_threshold")
+    @classmethod
+    def validate_consensus_threshold(cls, v: float) -> float:
         if not 0 <= v <= 1:
             raise ConfigurationError("consensus_threshold must be between 0 and 1")
         return v
+
+    @model_validator(mode="after")
+    def validate_family_size_range(self) -> Self:
+        """Validate that max_family_size >= min_family_size."""
+        if self.max_family_size < self.min_family_size:
+            raise ConfigurationError("max_family_size must be >= min_family_size")
+        return self
 
     def adapt_to_data_quality(self, quality_stats: dict[str, Any]) -> UMIConfig:
         """Adapt UMI configuration based on data quality characteristics."""
@@ -130,21 +135,24 @@ class StatsConfig(BaseModel):
     alpha: float
     fdr_method: str
 
-    @validator("test_type")
-    def validate_test_type(cls, v):
+    @field_validator("test_type")
+    @classmethod
+    def validate_test_type(cls, v: str) -> str:
         valid_test_types = ["poisson", "binomial", "fisher"]
         if v not in valid_test_types:
             raise ConfigurationError(f"test_type must be one of {valid_test_types}")
         return v
 
-    @validator("alpha")
-    def validate_alpha(cls, v):
+    @field_validator("alpha")
+    @classmethod
+    def validate_alpha(cls, v: float) -> float:
         if not 0 < v < 1:
             raise ConfigurationError("alpha must be between 0 and 1")
         return v
 
-    @validator("fdr_method")
-    def validate_fdr_method(cls, v):
+    @field_validator("fdr_method")
+    @classmethod
+    def validate_fdr_method(cls, v: str) -> str:
         valid_fdr_methods = ["benjamini_hochberg", "bonferroni", "holm"]
         if v not in valid_fdr_methods:
             raise ConfigurationError(f"fdr_method must be one of {valid_fdr_methods}")
@@ -166,14 +174,16 @@ class LODConfig(BaseModel):
     detection_threshold: float
     confidence_level: float
 
-    @validator("detection_threshold")
-    def validate_detection_threshold(cls, v):
+    @field_validator("detection_threshold")
+    @classmethod
+    def validate_detection_threshold(cls, v: float) -> float:
         if not 0 < v < 1:
             raise ConfigurationError("detection_threshold must be between 0 and 1")
         return v
 
-    @validator("confidence_level")
-    def validate_confidence_level(cls, v):
+    @field_validator("confidence_level")
+    @classmethod
+    def validate_confidence_level(cls, v: float) -> float:
         if not 0 < v < 1:
             raise ConfigurationError("confidence_level must be between 0 and 1")
         return v
@@ -196,26 +206,30 @@ class FASTQConfig(BaseModel):
     quality_threshold: int = 20
     min_family_size: int = 3
 
-    @validator("input_path")
-    def validate_input_path(cls, v):
+    @field_validator("input_path")
+    @classmethod
+    def validate_input_path(cls, v: str) -> str:
         if not v:
             raise ConfigurationError("input_path cannot be empty")
         return v
 
-    @validator("max_reads")
-    def validate_max_reads(cls, v):
+    @field_validator("max_reads")
+    @classmethod
+    def validate_max_reads(cls, v: int | None) -> int | None:
         if v is not None and v <= 0:
             raise ConfigurationError("max_reads must be positive")
         return v
 
-    @validator("quality_threshold")
-    def validate_quality_threshold(cls, v):
+    @field_validator("quality_threshold")
+    @classmethod
+    def validate_quality_threshold(cls, v: int) -> int:
         if not 0 <= v <= 60:
             raise ConfigurationError("quality_threshold must be between 0 and 60")
         return v
 
-    @validator("min_family_size")
-    def validate_min_family_size(cls, v):
+    @field_validator("min_family_size")
+    @classmethod
+    def validate_min_family_size(cls, v: int) -> int:
         if v <= 0:
             raise ConfigurationError("min_family_size must be positive")
         return v
@@ -257,6 +271,8 @@ class ConfigVersion(BaseModel):
 class PipelineConfig(BaseModel):
     """Enhanced main pipeline configuration with inheritance and validation."""
 
+    model_config = ConfigDict(validate_assignment=True)
+
     run_id: str
     seed: int
     umi: UMIConfig
@@ -271,9 +287,6 @@ class PipelineConfig(BaseModel):
     description: str = ""
     created_at: str | None = None
     last_modified: str | None = None
-
-    class Config:
-        validate_assignment = True
 
     def __init__(self, **data):
         super().__init__(**data)
