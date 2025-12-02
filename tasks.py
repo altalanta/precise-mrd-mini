@@ -1,3 +1,5 @@
+"""Celery tasks for background pipeline execution."""
+
 from .celery_app import celery_app
 from .database import SessionLocal
 from .job_manager import JobManager
@@ -10,7 +12,12 @@ log = get_logger(__name__)
 
 @celery_app.task(bind=True)
 def run_pipeline_task(self, job_id: str, config_request_dict: dict):
-    """Celery task to run the MRD pipeline."""
+    """
+    Celery task to run the MRD pipeline.
+
+    This task runs in a separate worker process and uses synchronous
+    database sessions since Celery tasks are not async.
+    """
     db = SessionLocal()
     job_manager = JobManager(db)
     pipeline_service = PipelineService()
