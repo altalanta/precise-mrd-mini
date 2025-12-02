@@ -88,12 +88,16 @@ class ServiceStatus(BaseModel):
     message: str | None = Field(
         None, description="Additional details about the service status."
     )
+    response_time_ms: float | None = Field(
+        None, description="Response time of the health check in milliseconds."
+    )
 
 
 class HealthStatus(BaseModel):
     """Overall health status of the API."""
 
     status: str = Field(..., description="Overall status ('ok' or 'error').")
+    version: str = Field(..., description="API version.")
     services: list[ServiceStatus] = Field(
         ..., description="Status of individual downstream services."
     )

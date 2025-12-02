@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import tempfile
 import time
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
@@ -20,13 +22,14 @@ from fastapi import (
 )
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
-from sqlalchemy.orm import Session
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from .celery_app import celery_app
 from .config import ConfigValidator, PipelineConfig, dump_config, load_config
-from .database import get_db, init_db
+from .database import async_engine, get_async_db, init_db
 from .exceptions import ConfigurationError
-from .job_manager import JobManager, get_job_manager
+from .job_manager import AsyncJobManager, get_async_job_manager
 from .logging_config import get_logger, setup_logging
 from .schemas import (
     ConfigFromTemplateResponse,
@@ -43,6 +46,38 @@ from .tasks import run_pipeline_task
 from .tracing import instrument_fastapi_app, setup_telemetry
 
 log = get_logger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    """
+    Lifespan context manager for application startup and shutdown.
+
+    This replaces the deprecated @app.on_event("startup") and @app.on_event("shutdown")
+    decorators with the modern lifespan pattern recommended by FastAPI.
+
+    Startup:
+        - Configure structured logging
+        - Initialize OpenTelemetry tracing
+        - Instrument the FastAPI app for telemetry
+        - Initialize the database schema
+
+    Shutdown:
+        - Dispose of the async database engine connections
+    """
+    # === Startup ===
+    setup_logging()
+    setup_telemetry()
+    instrument_fastapi_app(app)
+    init_db()
+    log.info("Application startup complete. Logging, Telemetry, and DB configured.")
+
+    yield  # Application runs here
+
+    # === Shutdown ===
+    log.info("Application shutdown initiated. Cleaning up resources...")
+    await async_engine.dispose()
+    log.info("Database connections closed. Shutdown complete.")
 
 
 class ConnectionManager:
@@ -78,7 +113,7 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 
-# FastAPI application
+# FastAPI application with lifespan context manager
 app = FastAPI(
     title="Precise MRD Pipeline API",
     description="""
@@ -95,17 +130,8 @@ detection pipeline.
         "name": "MIT License",
         "url": "https://opensource.org/licenses/MIT",
     },
+    lifespan=lifespan,
 )
-
-
-@app.on_event("startup")
-async def startup_event():
-    """Configure logging and telemetry on application startup."""
-    setup_logging()
-    setup_telemetry()
-    instrument_fastapi_app(app)
-    init_db()
-    log.info("Application startup complete. Logging, Telemetry, and DB configured.")
 
 
 # CORS middleware for web integration
@@ -148,38 +174,68 @@ async def structured_logging_middleware(request: Request, call_next):
     summary="Get Service Health Status",
     description="""
     Performs a health check on the API and its downstream services,
-    including the database and Redis cache.
+    including the database and Redis cache. Returns response times for each service.
     """,
     tags=["Health"],
 )
-def get_health_status(db: Session = Depends(get_db)):
+async def get_health_status(db: AsyncSession = Depends(get_async_db)):
     """Check the health of the service and its dependencies."""
+    services: list[ServiceStatus] = []
+
+    # Database health check with timing
+    db_start = time.perf_counter()
     db_status = "ok"
     db_message = "Database connection successful."
     try:
-        # Perform a simple query to check DB connection
-        db.execute("SELECT 1")
+        # Use SQLAlchemy text() for type-safe raw SQL execution
+        result = await db.execute(text("SELECT 1 AS health_check"))
+        row = result.scalar_one()
+        if row != 1:
+            db_status = "error"
+            db_message = f"Database returned unexpected value: {row}"
     except Exception as e:
         db_status = "error"
-        db_message = f"Database connection failed: {e}"
+        db_message = f"Database connection failed: {type(e).__name__}: {e}"
+    db_response_time = (time.perf_counter() - db_start) * 1000
 
+    services.append(
+        ServiceStatus(
+            name="database",
+            status=db_status,
+            message=db_message,
+            response_time_ms=round(db_response_time, 2),
+        )
+    )
+
+    # Redis health check with timing
+    redis_start = time.perf_counter()
     redis_status = "ok"
     redis_message = "Redis connection successful."
     try:
         # Perform a simple ping to check Redis connection
+        # Note: This is a sync call; for high-traffic APIs consider using aioredis
         celery_app.backend.client.ping()
     except Exception as e:
         redis_status = "error"
-        redis_message = f"Redis connection failed: {e}"
+        redis_message = f"Redis connection failed: {type(e).__name__}: {e}"
+    redis_response_time = (time.perf_counter() - redis_start) * 1000
 
-    overall_status = "ok" if db_status == "ok" and redis_status == "ok" else "error"
+    services.append(
+        ServiceStatus(
+            name="redis",
+            status=redis_status,
+            message=redis_message,
+            response_time_ms=round(redis_response_time, 2),
+        )
+    )
+
+    # Determine overall status
+    overall_status = "ok" if all(s.status == "ok" for s in services) else "error"
 
     return HealthStatus(
         status=overall_status,
-        services=[
-            ServiceStatus(name="database", status=db_status, message=db_message),
-            ServiceStatus(name="redis", status=redis_status, message=redis_message),
-        ],
+        version=app.version,
+        services=services,
     )
 
 
@@ -211,7 +267,7 @@ async def websocket_endpoint(websocket: WebSocket, job_id: str):
     tags=["Jobs"],
 )
 async def submit_pipeline_job(
-    job_manager: JobManager = Depends(get_job_manager),
+    job_manager: AsyncJobManager = Depends(get_async_job_manager),
     run_id: str = Form(
         ...,
         description="A unique identifier for this specific run, e.g., 'patient_123_run_1'.",
@@ -258,20 +314,22 @@ async def submit_pipeline_job(
         )
 
         # Create job
-        job = job_manager.create_job(config_request)
+        job = await job_manager.create_job(config_request)
         # Dispatch the task to Celery
         run_pipeline_task.delay(job.id, config_request.dict())
-        job_manager.update_job_status(job.id, "queued", 0.0)
+        await job_manager.update_job_status(job.id, "queued", 0.0)
 
         return JobStatus(
             job_id=job.id, status="queued", progress=0.0, start_time=job.created_at
         )
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to submit job: {str(e)}") from e
     except ConfigurationError as e:
         raise HTTPException(
             status_code=400, detail=f"Invalid configuration provided: {e}"
+        ) from e
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to submit job: {str(e)}"
         ) from e
 
 
@@ -283,10 +341,10 @@ async def submit_pipeline_job(
     tags=["Jobs"],
 )
 async def get_job_status(
-    job_id: str, job_manager: JobManager = Depends(get_job_manager)
+    job_id: str, job_manager: AsyncJobManager = Depends(get_async_job_manager)
 ):
     """Get the status of a pipeline job."""
-    job = job_manager.get_job(job_id)
+    job = await job_manager.get_job(job_id)
     if not job:
         raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
     return JobStatus(
@@ -310,10 +368,10 @@ async def get_job_status(
     tags=["Jobs"],
 )
 async def get_job_results(
-    job_id: str, job_manager: JobManager = Depends(get_job_manager)
+    job_id: str, job_manager: AsyncJobManager = Depends(get_async_job_manager)
 ):
     """Get the results of a completed pipeline job."""
-    job = job_manager.get_job(job_id)
+    job = await job_manager.get_job(job_id)
 
     if not job or job.status == "pending":
         raise HTTPException(
@@ -340,10 +398,12 @@ async def get_job_results(
     tags=["Artifacts"],
 )
 async def download_artifact(
-    job_id: str, artifact_type: str, job_manager: JobManager = Depends(get_job_manager)
+    job_id: str,
+    artifact_type: str,
+    job_manager: AsyncJobManager = Depends(get_async_job_manager),
 ):
     """Download a specific artifact from a completed job."""
-    job = job_manager.get_job(job_id)
+    job = await job_manager.get_job(job_id)
 
     if not job or job.status != "completed" or not job.results:
         raise HTTPException(status_code=404, detail="Artifact not available")
@@ -374,11 +434,11 @@ async def download_artifact(
     tags=["Jobs"],
 )
 async def list_jobs(
-    job_manager: JobManager = Depends(get_job_manager),
+    job_manager: AsyncJobManager = Depends(get_async_job_manager),
     limit: int = Query(50, description="The maximum number of jobs to return."),
 ):
     """List recent jobs."""
-    jobs = job_manager.get_all_jobs(limit=limit)
+    jobs = await job_manager.get_all_jobs(limit=limit)
     job_statuses = [
         JobStatus(
             job_id=job.id,
