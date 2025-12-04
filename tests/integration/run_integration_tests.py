@@ -20,9 +20,7 @@ def run_command(cmd: str, description: str = "") -> bool:
 
     try:
         start_time = time.time()
-        subprocess.run(
-            cmd, shell=True, check=True, capture_output=True, text=True
-        )
+        subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True)
         end_time = time.time()
 
         print(f"   ✅ Success in {end_time - start_time:.2f}s")
