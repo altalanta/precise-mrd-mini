@@ -89,10 +89,9 @@ class StratifiedAnalyzer:
                             context_calls = calls_df[
                                 calls_df.get("context", "NpN") == context
                             ]
-                            detection_rate = (
-                                len(context_calls[context_calls["variant_call"]])
-                                / max(1, len(context_calls))
-                            )
+                            detection_rate = len(
+                                context_calls[context_calls["variant_call"]]
+                            ) / max(1, len(context_calls))
                         else:
                             detection_rate = 0.0
 
