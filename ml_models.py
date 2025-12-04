@@ -400,9 +400,7 @@ class GradientBoostedVariantCaller:
             )
         elif hasattr(self.model, "coef_"):
             # For linear models
-            return dict(
-                zip(self.selected_features, self.model.coef_[0], strict=False)
-            )
+            return dict(zip(self.selected_features, self.model.coef_[0], strict=False))
 
         return {}
 
