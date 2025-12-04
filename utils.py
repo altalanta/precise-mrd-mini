@@ -5,10 +5,10 @@ from __future__ import annotations
 import hashlib
 import json
 import subprocess
+from importlib.metadata import distributions
 from pathlib import Path
 
 import pandas as pd
-import pkg_resources
 import yaml
 
 
@@ -120,7 +120,10 @@ def validate_repository_state() -> list[str]:
     return errors
 
 
-def get_package_versions() -> dict:
-    """Get the versions of all installed packages."""
-    packages = {dist.project_name: dist.version for dist in pkg_resources.working_set}
-    return packages
+def get_package_versions() -> dict[str, str]:
+    """Get the versions of all installed packages.
+
+    Returns:
+        Dictionary mapping package names to their installed versions.
+    """
+    return {dist.metadata["Name"]: dist.version for dist in distributions()}
