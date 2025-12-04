@@ -254,9 +254,9 @@ class LODAnalyzer:
                     # Estimate AF from variant calls
                     if not calls_df.empty:
                         # Simple AF estimation: variants detected / total UMIs
-                        estimated_af = len(
-                            calls_df[calls_df["variant_call"]]
-                        ) / len(calls_df)
+                        estimated_af = len(calls_df[calls_df["variant_call"]]) / len(
+                            calls_df
+                        )
                         estimated_afs.append(estimated_af)
                     else:
                         estimated_afs.append(0.0)
