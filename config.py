@@ -421,7 +421,21 @@ class PipelineConfig(BaseModel):
 
 
 def load_config(path: str | Path, auto_migrate: bool = True) -> PipelineConfig:
-    """Load configuration from YAML file with validation and optional migration."""
+    """Load configuration from YAML file with validation and optional migration.
+
+    Args:
+        path: Path to the YAML configuration file.
+        auto_migrate: If True, automatically migrates older configuration versions
+            to the latest format. Defaults to True.
+
+    Returns:
+        A validated PipelineConfig instance.
+
+    Raises:
+        FileNotFoundError: If the configuration file does not exist.
+        ConfigurationError: If the configuration is invalid or cannot be parsed.
+        yaml.YAMLError: If the file contains invalid YAML syntax.
+    """
     with open(path) as f:
         data = yaml.safe_load(f)
 
@@ -431,10 +445,29 @@ def load_config(path: str | Path, auto_migrate: bool = True) -> PipelineConfig:
     return PipelineConfig(**data)
 
 
-def dump_config(config: PipelineConfig, path: str | Path) -> None:
-    """Save configuration to YAML file with full metadata."""
+def dump_config(config: PipelineConfig, path: str | Path | None) -> str | None:
+    """Save configuration to YAML file with full metadata.
+
+    If path is None, returns the YAML string instead of writing to file.
+
+    Args:
+        config: The PipelineConfig instance to serialize.
+        path: Path to write the YAML file, or None to return as string.
+
+    Returns:
+        The YAML string if path is None, otherwise None.
+
+    Raises:
+        PermissionError: If the file cannot be written to the specified path.
+    """
+    yaml_str = yaml.safe_dump(
+        config.to_dict(), default_flow_style=False, sort_keys=False
+    )
+    if path is None:
+        return yaml_str
     with open(path, "w") as f:
-        yaml.safe_dump(config.to_dict(), f, default_flow_style=False, sort_keys=False)
+        f.write(yaml_str)
+    return None
 
 
 def _migrate_simulation_config(old_config: dict[str, Any]) -> dict[str, Any]:
