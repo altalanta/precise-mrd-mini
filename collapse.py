@@ -19,6 +19,35 @@ try:
 except ImportError:
     DASK_AVAILABLE = False
 
+# =============================================================================
+# Constants for UMI collapse simulation
+# =============================================================================
+
+# Quality score bounds (Phred scale)
+MIN_QUALITY_SCORE: int = 10
+MAX_QUALITY_SCORE: int = 40
+BASE_QUALITY_SCORE: int = 25
+QUALITY_SCORE_STD: float = 3.0
+
+# Quality-to-AF scaling factor: higher AF samples get higher quality scores
+QUALITY_AF_SCALE: float = 100.0
+
+# Consensus agreement bounds
+MIN_CONSENSUS_AGREEMENT: float = 0.7
+MAX_CONSENSUS_AGREEMENT: float = 0.95
+
+# Minimum mean family size fallback
+DEFAULT_MIN_MEAN_FAMILY_SIZE: int = 3
+
+# Variant calling thresholds
+TRUE_VARIANT_AF_THRESHOLD: float = 0.01  # AF above which true variants are expected
+TRUE_VARIANT_PROBABILITY: float = (
+    0.8  # Probability of calling true variant when AF > threshold
+)
+
+# Default number of Dask partitions
+DEFAULT_N_PARTITIONS: int = 4
+
 
 @pa.check_input(
     pa.DataFrameSchema(SimulatedReadsSchema.to_schema().columns, strict=False)
@@ -117,7 +146,9 @@ def _collapse_umis_sequential(
             for family_id in range(n_families):
                 # Use deterministic family size based on sample statistics
                 # This ensures reproducibility while maintaining performance
-                mean_size = max(3, sample["mean_family_size"])
+                mean_size = max(
+                    DEFAULT_MIN_MEAN_FAMILY_SIZE, sample["mean_family_size"]
+                )
                 family_size = max(1, int(rng.poisson(mean_size)))
                 family_size = min(family_size, max_family_size)
 
@@ -127,23 +158,32 @@ def _collapse_umis_sequential(
 
                 # Use deterministic quality scores based on allele fraction
                 # Higher AF samples get higher quality scores
-                base_quality = 25 + (allele_fraction * 100)  # Scale with AF
-                quality_score = rng.normal(base_quality, 3)
-                quality_score = np.clip(quality_score, 10, 40)
+                base_quality = BASE_QUALITY_SCORE + (allele_fraction * QUALITY_AF_SCALE)
+                quality_score = rng.normal(base_quality, QUALITY_SCORE_STD)
+                quality_score = np.clip(
+                    quality_score, MIN_QUALITY_SCORE, MAX_QUALITY_SCORE
+                )
 
                 # Determine if consensus passes quality threshold
                 passes_quality = quality_score >= quality_threshold
 
                 # Use deterministic consensus agreement based on quality
                 # Higher quality gets higher consensus agreement
+                # Scale from MIN_CONSENSUS_AGREEMENT to MAX_CONSENSUS_AGREEMENT
+                quality_range = MAX_QUALITY_SCORE - MIN_QUALITY_SCORE
                 consensus_base = min(
-                    0.95, 0.7 + (quality_score - 10) / 60
-                )  # Scale from 0.7 to 0.95, cap at 0.95
+                    MAX_CONSENSUS_AGREEMENT,
+                    MIN_CONSENSUS_AGREEMENT
+                    + (quality_score - MIN_QUALITY_SCORE) / quality_range,
+                )
                 consensus_agreement = rng.uniform(consensus_base, 1.0)
                 passes_consensus = consensus_agreement >= consensus_threshold
 
                 # Determine variant call deterministically based on AF and background rate
-                is_true_variant = allele_fraction > 0.01 and rng.random() < 0.8
+                is_true_variant = (
+                    allele_fraction > TRUE_VARIANT_AF_THRESHOLD
+                    and rng.random() < TRUE_VARIANT_PROBABILITY
+                )
                 is_background_error = rng.random() < background_rate
                 is_variant = (
                     passes_quality
@@ -205,7 +245,7 @@ def _process_sample_group(
         # Generate UMI family consensus data for this sample
         for family_id in range(n_families):
             # Use deterministic family size based on sample statistics
-            mean_size = max(3, sample["mean_family_size"])
+            mean_size = max(DEFAULT_MIN_MEAN_FAMILY_SIZE, sample["mean_family_size"])
             family_size = max(1, int(rng.poisson(mean_size)))
             family_size = min(family_size, max_family_size)
 
@@ -214,17 +254,25 @@ def _process_sample_group(
                 continue
 
             # Use deterministic quality scores based on allele fraction
-            base_quality = 25 + (allele_fraction * 100)
-            quality_score = rng.normal(base_quality, 3)
-            quality_score = np.clip(quality_score, 10, 40)
+            base_quality = BASE_QUALITY_SCORE + (allele_fraction * QUALITY_AF_SCALE)
+            quality_score = rng.normal(base_quality, QUALITY_SCORE_STD)
+            quality_score = np.clip(quality_score, MIN_QUALITY_SCORE, MAX_QUALITY_SCORE)
 
             passes_quality = quality_score >= quality_threshold
 
-            consensus_base = min(0.95, 0.7 + (quality_score - 10) / 60)
+            quality_range = MAX_QUALITY_SCORE - MIN_QUALITY_SCORE
+            consensus_base = min(
+                MAX_CONSENSUS_AGREEMENT,
+                MIN_CONSENSUS_AGREEMENT
+                + (quality_score - MIN_QUALITY_SCORE) / quality_range,
+            )
             consensus_agreement = rng.uniform(consensus_base, 1.0)
             passes_consensus = consensus_agreement >= consensus_threshold
 
-            is_true_variant = allele_fraction > 0.01 and rng.random() < 0.8
+            is_true_variant = (
+                allele_fraction > TRUE_VARIANT_AF_THRESHOLD
+                and rng.random() < TRUE_VARIANT_PROBABILITY
+            )
             is_background_error = rng.random() < background_rate
             is_variant = (
                 passes_quality
@@ -268,7 +316,7 @@ def _collapse_umis_parallel(
                 "Dask is required for parallel processing but is not available"
             )
 
-        ddf = dd.from_pandas(reads_df, npartitions=n_partitions or 4)
+        ddf = dd.from_pandas(reads_df, npartitions=n_partitions or DEFAULT_N_PARTITIONS)
 
         def process_fastq_partition(partition_df):
             collapsed_data = []
