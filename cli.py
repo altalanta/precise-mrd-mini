@@ -87,7 +87,7 @@ def _json_ready(payload: dict[str, Any]) -> dict[str, Any]:
 
     def _convert(obj: Any) -> Any:
         try:
-            import numpy as np  # noqa: WPS433 (import inside helper)
+            import numpy as np
         except (
             ModuleNotFoundError
         ):  # pragma: no cover - numpy always present in runtime deps
@@ -831,8 +831,6 @@ def ml_performance_cmd(reset: bool) -> None:
             click.echo(f"  {i + 1}. {model}: {auc:.3f}")
 
     click.echo(f"📊 Models Tracked: {ml_report['n_models_tracked']}")
-
-
 
 
 @main.command("dashboard")
