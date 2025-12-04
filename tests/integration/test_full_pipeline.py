@@ -260,7 +260,7 @@ class TestFullPipelineIntegration:
         config = PipelineConfig.from_dict(base_config)
         output_path = temp_dir / "contract_test"
 
-        results = self._run_full_pipeline(config, output_path)
+        self._run_full_pipeline(config, output_path)
 
         # Validate all required artifacts are present
         required_artifacts = [
