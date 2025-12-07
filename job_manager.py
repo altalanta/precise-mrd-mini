@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
 from .database import Job, SessionLocal, get_async_db
+from .enums import JobStatusEnum
 from .schemas import PipelineConfigRequest
 
 # This type hint helps with auto-completion, but we avoid a circular import
@@ -31,7 +32,10 @@ class JobManager:
         """Create a new pipeline job in the database."""
         job_id = str(uuid.uuid4())
         new_job = Job(
-            id=job_id, run_id=config_request.run_id, status="pending", progress=0.0
+            id=job_id,
+            run_id=config_request.run_id,
+            status=JobStatusEnum.PENDING,
+            progress=0.0,
         )
         self.db.add(new_job)
         self.db.commit()
@@ -55,7 +59,7 @@ class JobManager:
             job.progress = progress
 
         if error:
-            job.status = "failed"
+            job.status = JobStatusEnum.FAILED
             job.set_results({"error": error})
 
         self.db.commit()
@@ -117,7 +121,10 @@ class AsyncJobManager:
         """Create a new pipeline job in the database."""
         job_id = str(uuid.uuid4())
         new_job = Job(
-            id=job_id, run_id=config_request.run_id, status="pending", progress=0.0
+            id=job_id,
+            run_id=config_request.run_id,
+            status=JobStatusEnum.PENDING,
+            progress=0.0,
         )
         self.db.add(new_job)
         await self.db.commit()
@@ -142,7 +149,7 @@ class AsyncJobManager:
             job.progress = progress
 
         if error:
-            job.status = "failed"
+            job.status = JobStatusEnum.FAILED
             job.set_results({"error": error})
 
         await self.db.commit()
