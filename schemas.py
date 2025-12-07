@@ -5,6 +5,13 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from .enums import (
+    DLModelType,
+    HealthStatusEnum,
+    JobStatusEnum,
+    MLModelType,
+)
+
 
 # Pydantic models for API requests/responses
 class PipelineConfigRequest(BaseModel):
@@ -20,17 +27,22 @@ class PipelineConfigRequest(BaseModel):
     use_deep_learning: bool = Field(
         False, description="Enable deep learning variant calling"
     )
-    ml_model_type: str = Field("ensemble", description="ML model type")
-    dl_model_type: str = Field("cnn_lstm", description="Deep learning model type")
+    ml_model_type: MLModelType = Field("ensemble", description="ML model type")
+    dl_model_type: DLModelType = Field(
+        "cnn_lstm", description="Deep learning model type"
+    )
 
 
 class JobStatus(BaseModel):
     """Job status response model."""
 
     job_id: str
-    status: str  # pending, running, completed, failed
-    progress: float
-    start_time: datetime | None
+    status: JobStatusEnum | str = Field(
+        ...,
+        description="Job status: pending, queued, running, completed, failed, or cancelled",
+    )
+    progress: float = Field(..., ge=0.0, le=1.0, description="Progress from 0.0 to 1.0")
+    start_time: datetime | None = None
     end_time: datetime | None = None
     error_message: str | None = None
     results: dict[str, Any] | None = None
@@ -84,7 +96,9 @@ class ServiceStatus(BaseModel):
     name: str = Field(
         ..., description="Name of the service (e.g., 'database', 'redis')."
     )
-    status: str = Field(..., description="Service status ('ok' or 'error').")
+    status: HealthStatusEnum | str = Field(
+        ..., description="Service status ('ok', 'error', or 'degraded')."
+    )
     message: str | None = Field(
         None, description="Additional details about the service status."
     )
@@ -96,7 +110,9 @@ class ServiceStatus(BaseModel):
 class HealthStatus(BaseModel):
     """Overall health status of the API."""
 
-    status: str = Field(..., description="Overall status ('ok' or 'error').")
+    status: HealthStatusEnum | str = Field(
+        ..., description="Overall status ('ok', 'error', or 'degraded')."
+    )
     version: str = Field(..., description="API version.")
     services: list[ServiceStatus] = Field(
         ..., description="Status of individual downstream services."
