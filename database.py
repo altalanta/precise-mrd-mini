@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy.sql import func
 
+from .enums import JobStatusEnum
 from .settings import settings
 
 # --- Sync Engine (for Celery tasks and migrations) ---
@@ -44,7 +45,7 @@ class Job(Base):
 
     id = Column(String, primary_key=True, index=True)
     run_id = Column(String, index=True)
-    status = Column(String, default="pending")
+    status = Column(String, default=JobStatusEnum.PENDING)
     progress = Column(Float, default=0.0)
     results = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
