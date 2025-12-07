@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -121,7 +121,7 @@ class PipelineService:
                 "job_id": job_id,
                 "run_id": config_request.run_id,
                 "seed": config_request.seed,
-                "timestamp": datetime.now().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "config_hash": config.config_hash(),
                 "api_version": "2.0.0",
                 "processing_options": {

@@ -11,6 +11,7 @@ from typing import Any, Self
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from .enums import FDRMethod, StatisticalTestType
 from .exceptions import ConfigurationError
 
 
@@ -129,34 +130,26 @@ class UMIConfig(BaseModel):
 
 
 class StatsConfig(BaseModel):
-    """Configuration for statistical testing."""
+    """Configuration for statistical testing.
 
-    test_type: str
-    alpha: float
-    fdr_method: str
+    Attributes:
+        test_type: Statistical test to use for variant calling.
+            Must be one of: "poisson", "binomial", "fisher".
+        alpha: Significance level for hypothesis testing (0 < alpha < 1).
+        fdr_method: False discovery rate correction method.
+            Must be one of: "benjamini_hochberg", "bonferroni", "holm".
+    """
 
-    @field_validator("test_type")
-    @classmethod
-    def validate_test_type(cls, v: str) -> str:
-        valid_test_types = ["poisson", "binomial", "fisher"]
-        if v not in valid_test_types:
-            raise ConfigurationError(f"test_type must be one of {valid_test_types}")
-        return v
-
-    @field_validator("alpha")
-    @classmethod
-    def validate_alpha(cls, v: float) -> float:
-        if not 0 < v < 1:
-            raise ConfigurationError("alpha must be between 0 and 1")
-        return v
-
-    @field_validator("fdr_method")
-    @classmethod
-    def validate_fdr_method(cls, v: str) -> str:
-        valid_fdr_methods = ["benjamini_hochberg", "bonferroni", "holm"]
-        if v not in valid_fdr_methods:
-            raise ConfigurationError(f"fdr_method must be one of {valid_fdr_methods}")
-        return v
+    test_type: StatisticalTestType = Field(
+        ..., description="Statistical test type: poisson, binomial, or fisher"
+    )
+    alpha: float = Field(
+        ..., gt=0, lt=1, description="Significance level (0 < alpha < 1)"
+    )
+    fdr_method: FDRMethod = Field(
+        ...,
+        description="FDR correction method: benjamini_hochberg, bonferroni, or holm",
+    )
 
     def get_power_analysis_config(self) -> dict[str, Any]:
         """Get configuration for power analysis."""
@@ -293,10 +286,10 @@ class PipelineConfig(BaseModel):
         self._set_timestamps()
 
     def _set_timestamps(self):
-        """Set creation and modification timestamps."""
-        import datetime
+        """Set creation and modification timestamps using UTC."""
+        from datetime import datetime, timezone
 
-        now = datetime.datetime.now().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         if not self.created_at:
             self.created_at = now
         self.last_modified = now

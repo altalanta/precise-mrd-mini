@@ -14,7 +14,29 @@ from .config import PipelineConfig, dump_config, load_config
 
 # Determinism and reproducibility
 from .determinism_utils import env_fingerprint, set_global_seed
+
+# Enums and type definitions
+from .enums import (
+    DLModelType,
+    FDRMethod,
+    HealthStatusEnum,
+    JobStatusEnum,
+    MLModelType,
+    StatisticalTestType,
+)
 from .error_model import fit_error_model
+
+# Exceptions
+from .exceptions import (
+    APIError,
+    ArtifactValidationError,
+    ConfigurationError,
+    DataProcessingError,
+    ErrorCode,
+    FileOperationError,
+    JobError,
+    PreciseMRDError,
+)
 from .fastq import detect_umi_format, process_fastq_to_dataframe
 from .metrics import average_precision, roc_auc_score
 from .performance import get_performance_report, reset_performance_monitor
@@ -41,6 +63,22 @@ __all__ = [
     "dump_config",
     "PipelineIO",
     "PipelineCache",
+    # Enums and type definitions
+    "JobStatusEnum",
+    "HealthStatusEnum",
+    "MLModelType",
+    "DLModelType",
+    "StatisticalTestType",
+    "FDRMethod",
+    "ErrorCode",
+    # Exceptions
+    "PreciseMRDError",
+    "ConfigurationError",
+    "DataProcessingError",
+    "ArtifactValidationError",
+    "FileOperationError",
+    "JobError",
+    "APIError",
     # Determinism
     "set_global_seed",
     "env_fingerprint",

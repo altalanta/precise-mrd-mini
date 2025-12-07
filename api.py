@@ -28,6 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .celery_app import celery_app
 from .config import ConfigValidator, PipelineConfig, dump_config, load_config
 from .database import async_engine, get_async_db, init_db
+from .enums import HealthStatusEnum, JobStatusEnum
 from .exceptions import ConfigurationError
 from .job_manager import AsyncJobManager, get_async_job_manager
 from .logging_config import get_logger, setup_logging
@@ -184,17 +185,17 @@ async def get_health_status(db: AsyncSession = Depends(get_async_db)):
 
     # Database health check with timing
     db_start = time.perf_counter()
-    db_status = "ok"
+    db_status = HealthStatusEnum.OK
     db_message = "Database connection successful."
     try:
         # Use SQLAlchemy text() for type-safe raw SQL execution
         result = await db.execute(text("SELECT 1 AS health_check"))
         row = result.scalar_one()
         if row != 1:
-            db_status = "error"
+            db_status = HealthStatusEnum.ERROR
             db_message = f"Database returned unexpected value: {row}"
     except Exception as e:
-        db_status = "error"
+        db_status = HealthStatusEnum.ERROR
         db_message = f"Database connection failed: {type(e).__name__}: {e}"
     db_response_time = (time.perf_counter() - db_start) * 1000
 
@@ -209,14 +210,14 @@ async def get_health_status(db: AsyncSession = Depends(get_async_db)):
 
     # Redis health check with timing
     redis_start = time.perf_counter()
-    redis_status = "ok"
+    redis_status = HealthStatusEnum.OK
     redis_message = "Redis connection successful."
     try:
         # Perform a simple ping to check Redis connection
         # Note: This is a sync call; for high-traffic APIs consider using aioredis
         celery_app.backend.client.ping()
     except Exception as e:
-        redis_status = "error"
+        redis_status = HealthStatusEnum.ERROR
         redis_message = f"Redis connection failed: {type(e).__name__}: {e}"
     redis_response_time = (time.perf_counter() - redis_start) * 1000
 
@@ -230,7 +231,11 @@ async def get_health_status(db: AsyncSession = Depends(get_async_db)):
     )
 
     # Determine overall status
-    overall_status = "ok" if all(s.status == "ok" for s in services) else "error"
+    overall_status = (
+        HealthStatusEnum.OK
+        if all(s.status == HealthStatusEnum.OK for s in services)
+        else HealthStatusEnum.ERROR
+    )
 
     return HealthStatus(
         status=overall_status,
@@ -317,10 +322,13 @@ async def submit_pipeline_job(
         job = await job_manager.create_job(config_request)
         # Dispatch the task to Celery
         run_pipeline_task.delay(job.id, config_request.dict())
-        await job_manager.update_job_status(job.id, "queued", 0.0)
+        await job_manager.update_job_status(job.id, JobStatusEnum.QUEUED, 0.0)
 
         return JobStatus(
-            job_id=job.id, status="queued", progress=0.0, start_time=job.created_at
+            job_id=job.id,
+            status=JobStatusEnum.QUEUED,
+            progress=0.0,
+            start_time=job.created_at,
         )
 
     except ConfigurationError as e:
@@ -373,15 +381,15 @@ async def get_job_results(
     """Get the results of a completed pipeline job."""
     job = await job_manager.get_job(job_id)
 
-    if not job or job.status == "pending":
+    if not job or job.status == JobStatusEnum.PENDING:
         raise HTTPException(
             status_code=404, detail="Job not found or not yet submitted"
         )
 
-    if job.status == "running":
+    if job.status == JobStatusEnum.RUNNING:
         raise HTTPException(status_code=202, detail="Job is still running")
 
-    if job.status == "failed":
+    if job.status == JobStatusEnum.FAILED:
         raise HTTPException(status_code=500, detail="Job failed")
 
     results = job.get_results()
@@ -405,7 +413,7 @@ async def download_artifact(
     """Download a specific artifact from a completed job."""
     job = await job_manager.get_job(job_id)
 
-    if not job or job.status != "completed" or not job.results:
+    if not job or job.status != JobStatusEnum.COMPLETED or not job.results:
         raise HTTPException(status_code=404, detail="Artifact not available")
 
     results = job.get_results()
