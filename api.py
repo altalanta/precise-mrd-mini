@@ -118,7 +118,7 @@ manager = ConnectionManager()
 app = FastAPI(
     title="Precise MRD Pipeline API",
     description="""
-A robust, scalable, and reproducible REST API for the Precise MRD (Minimal Residual Disease)
+A robust, scalable, and reproducible REST API for the Precise MRD (Minimal Residual Disease) 
 detection pipeline.
     """,
     version="0.2.0",
@@ -174,7 +174,7 @@ async def structured_logging_middleware(request: Request, call_next):
     response_model=HealthStatus,
     summary="Get Service Health Status",
     description="""
-    Performs a health check on the API and its downstream services,
+    Performs a health check on the API and its downstream services, 
     including the database and Redis cache. Returns response times for each service.
     """,
     tags=["Health"],
@@ -263,10 +263,10 @@ async def websocket_endpoint(websocket: WebSocket, job_id: str):
     response_model=JobStatus,
     summary="Submit a New Pipeline Job",
     description="""
-    Submits a new MRD pipeline job for asynchronous execution.
-
-    The job is added to the Celery queue and will be picked up by an available worker.
-    You can specify the run configuration using a combination of form fields and an optional
+    Submits a new MRD pipeline job for asynchronous execution. 
+    
+    The job is added to the Celery queue and will be picked up by an available worker. 
+    You can specify the run configuration using a combination of form fields and an optional 
     YAML override.
     """,
     tags=["Jobs"],
@@ -370,7 +370,7 @@ async def get_job_status(
     response_model=PipelineResults,
     summary="Get Job Results",
     description="""
-    Retrieves the full results of a completed job, including metrics, run context,
+    Retrieves the full results of a completed job, including metrics, run context, 
     and paths to all generated artifacts. Returns an error if the job is not yet completed.
     """,
     tags=["Jobs"],
@@ -465,9 +465,9 @@ async def list_jobs(
     response_model=ValidationResponse,
     summary="Validate a Configuration",
     description="""
-    Validates a given YAML configuration string without submitting a job.
-
-    This is useful for checking the correctness of a configuration and getting an estimate
+    Validates a given YAML configuration string without submitting a job. 
+    
+    This is useful for checking the correctness of a configuration and getting an estimate 
     of the runtime before committing to a full pipeline run.
     """,
     tags=["Configuration"],
