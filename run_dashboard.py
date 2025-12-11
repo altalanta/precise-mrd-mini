@@ -103,20 +103,20 @@ def websocket_updater(job_id: str):
 
                 socket.onmessage = function(event) {{
                     try {{
-                        console.log(`[message] Data received from server: ${{event.data}}`);
-                        const data = JSON.parse(event.data);
-
-                        // Trigger a re-run in Streamlit by setting a query param.
-                        // This is a workaround to update the Python-side state.
-                        const currentUrl = new URL(window.location.href);
-                        if (currentUrl.searchParams.get("job_id") !== data.job_id ||
-                            currentUrl.searchParams.get("status") !== data.status ||
-                            currentUrl.searchParams.get("progress") !== data.progress) {{
-
-                            currentUrl.searchParams.set("job_id", data.job_id);
-                            currentUrl.searchParams.set("status", data.status);
+                    console.log(`[message] Data received from server: ${{event.data}}`);
+                    const data = JSON.parse(event.data);
+                    
+                    // Trigger a re-run in Streamlit by setting a query param.
+                    // This is a workaround to update the Python-side state.
+                    const currentUrl = new URL(window.location.href);
+                    if (currentUrl.searchParams.get("job_id") !== data.job_id ||
+                        currentUrl.searchParams.get("status") !== data.status ||
+                        currentUrl.searchParams.get("progress") !== data.progress) {{
+                        
+                        currentUrl.searchParams.set("job_id", data.job_id);
+                        currentUrl.searchParams.set("status", data.status);
                             currentUrl.searchParams.set("progress", data.progress);
-                            window.location.href = currentUrl.href;
+                        window.location.href = currentUrl.href;
                         }}
 
                         if (data.status === "completed" || data.status === "failed") {{
