@@ -9,7 +9,9 @@ import pandas as pd
 
 
 def render_plots(
-    calls_df: pd.DataFrame, metrics: dict[str, Any], output_dir: str = "reports"
+    calls_df: pd.DataFrame,
+    metrics: dict[str, Any],
+    output_dir: str = "reports",
 ) -> dict[str, str]:
     """Generate plots for MRD analysis.
 

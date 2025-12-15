@@ -41,7 +41,8 @@ class SimulationConfig(BaseModel):
         return total_samples * 0.01  # 0.01 minutes per sample
 
     def adapt_to_data_characteristics(
-        self, data_stats: dict[str, Any]
+        self,
+        data_stats: dict[str, Any],
     ) -> SimulationConfig:
         """Adapt configuration based on data characteristics."""
         adapted = copy.deepcopy(self)
@@ -123,7 +124,8 @@ class UMIConfig(BaseModel):
                 median_family_size = sorted(family_sizes)[len(family_sizes) // 2]
                 # Ensure minimum family size is reasonable for the dataset
                 adapted.min_family_size = max(
-                    1, min(self.min_family_size, median_family_size // 2)
+                    1,
+                    min(self.min_family_size, median_family_size // 2),
                 )
 
         return adapted
@@ -141,10 +143,14 @@ class StatsConfig(BaseModel):
     """
 
     test_type: StatisticalTestType = Field(
-        ..., description="Statistical test type: poisson, binomial, or fisher"
+        ...,
+        description="Statistical test type: poisson, binomial, or fisher",
     )
     alpha: float = Field(
-        ..., gt=0, lt=1, description="Significance level (0 < alpha < 1)"
+        ...,
+        gt=0,
+        lt=1,
+        description="Significance level (0 < alpha < 1)",
     )
     fdr_method: FDRMethod = Field(
         ...,
@@ -325,13 +331,13 @@ class PipelineConfig(BaseModel):
         # Adapt simulation configuration if present
         if adapted.simulation and "variant_frequencies" in data_characteristics:
             adapted.simulation = adapted.simulation.adapt_to_data_characteristics(
-                data_characteristics
+                data_characteristics,
             )
 
         # Adapt UMI configuration based on quality data
         if "quality_stats" in data_characteristics:
             adapted.umi = adapted.umi.adapt_to_data_quality(
-                data_characteristics["quality_stats"]
+                data_characteristics["quality_stats"],
             )
 
         # Update metadata
@@ -348,7 +354,7 @@ class PipelineConfig(BaseModel):
         # Check version compatibility
         if self.config_version != other.config_version:
             issues.append(
-                f"Configuration version mismatch: {self.config_version} vs {other.config_version}"
+                f"Configuration version mismatch: {self.config_version} vs {other.config_version}",
             )
 
         # Check for incompatible parameter combinations
@@ -358,7 +364,9 @@ class PipelineConfig(BaseModel):
         return issues
 
     def merge_with(
-        self, other: PipelineConfig, strategy: str = "override"
+        self,
+        other: PipelineConfig,
+        strategy: str = "override",
     ) -> PipelineConfig:
         """Merge this configuration with another using specified strategy."""
         if strategy == "override":
@@ -393,7 +401,9 @@ class PipelineConfig(BaseModel):
 
     @classmethod
     def from_template(
-        cls, template: dict[str, Any], run_id: str = None
+        cls,
+        template: dict[str, Any],
+        run_id: str = None,
     ) -> PipelineConfig:
         """Create configuration from template."""
         base_config = template["base_config"]
@@ -454,7 +464,9 @@ def dump_config(config: PipelineConfig, path: str | Path | None) -> str | None:
         PermissionError: If the file cannot be written to the specified path.
     """
     yaml_str = yaml.safe_dump(
-        config.to_dict(), default_flow_style=False, sort_keys=False
+        config.to_dict(),
+        default_flow_style=False,
+        sort_keys=False,
     )
     if path is None:
         return yaml_str
@@ -486,7 +498,7 @@ class ConfigVersionManager:
                 "Enhanced validation in all config classes",
                 "Added dynamic adaptation methods",
             ],
-        }
+        },
     }
 
     @staticmethod
@@ -496,7 +508,8 @@ class ConfigVersionManager:
 
     @staticmethod
     def migrate_config(
-        config_data: dict[str, Any], target_version: str = None
+        config_data: dict[str, Any],
+        target_version: str = None,
     ) -> dict[str, Any]:
         """Migrate configuration data to target version."""
         current_version = config_data.get("config_version", "1.0.0")
@@ -543,7 +556,8 @@ class ConfigVersionManager:
 
     @staticmethod
     def validate_version_compatibility(
-        config_version: str, required_version: str
+        config_version: str,
+        required_version: str,
     ) -> bool:
         """Check if a configuration version is compatible with required version."""
         # Simple version comparison - in practice, you'd want more sophisticated logic
@@ -560,7 +574,9 @@ class ConfigVersionManager:
             raise ConfigurationError(f"Invalid version format: {version_str}")
 
         return ConfigVersion(
-            major=int(parts[0]), minor=int(parts[1]), patch=int(parts[2])
+            major=int(parts[0]),
+            minor=int(parts[1]),
+            patch=int(parts[2]),
         )
 
 
@@ -594,13 +610,13 @@ class ConfigValidator:
         estimated_runtime = config.get_estimated_runtime()
         if estimated_runtime > 60:  # More than 1 hour
             warnings.append(
-                f"Estimated runtime is {estimated_runtime:.1f} minutes - consider optimization"
+                f"Estimated runtime is {estimated_runtime:.1f} minutes - consider optimization",
             )
 
         # Configuration suggestions
         if not config.description:
             suggestions.append(
-                "Add a description to document the purpose of this configuration"
+                "Add a description to document the purpose of this configuration",
             )
 
         if not config.tags:
@@ -628,13 +644,13 @@ class ConfigValidator:
             > 10000
         ):
             issues.append(
-                "Large parameter space may result in very long execution times"
+                "Large parameter space may result in very long execution times",
             )
 
         # Check for unrealistic allele frequencies
         if any(af > 0.5 for af in sim_config.allele_fractions):
             issues.append(
-                "Allele frequencies above 0.5 may be unrealistic for typical MRD scenarios"
+                "Allele frequencies above 0.5 may be unrealistic for typical MRD scenarios",
             )
 
         return issues
@@ -663,7 +679,7 @@ class ConfigValidator:
             # Suggest appropriate allele frequency ranges
             if len(config.simulation.allele_fractions) > 5:
                 suggestions.append(
-                    "Consider reducing the number of allele fractions for faster analysis"
+                    "Consider reducing the number of allele fractions for faster analysis",
                 )
 
         return suggestions
