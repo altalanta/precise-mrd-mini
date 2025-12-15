@@ -29,7 +29,7 @@ class PerformanceMonitor:
                 "total_time": 0.0,
                 "min_time": float("inf"),
                 "max_time": 0.0,
-            }
+            },
         )
         self.memory_usage = []
         self.start_time = time.time()
@@ -68,7 +68,7 @@ class PerformanceMonitor:
                     "timestamp": time.time(),
                     "rss_mb": memory_info.rss / 1024 / 1024,  # RSS in MB
                     "vms_mb": memory_info.vms / 1024 / 1024,  # VMS in MB
-                }
+                },
             )
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             pass
@@ -121,7 +121,6 @@ class PerformanceMonitor:
 
 def get_performance_monitor() -> PerformanceMonitor:
     """Get the global performance monitor."""
-    global _performance_monitor
     if _performance_monitor is None:
         with _monitor_lock:
             if _performance_monitor is None:
@@ -131,7 +130,6 @@ def get_performance_monitor() -> PerformanceMonitor:
 
 def reset_performance_monitor():
     """Reset the global performance monitor."""
-    global _performance_monitor
     with _monitor_lock:
         _performance_monitor = PerformanceMonitor()
 
@@ -338,7 +336,6 @@ class MLPerformanceTracker:
 
 def get_ml_performance_tracker() -> MLPerformanceTracker:
     """Get the global ML performance tracker."""
-    global _ml_tracker
     if _ml_tracker is None:
         _ml_tracker = MLPerformanceTracker()
     return _ml_tracker
@@ -346,7 +343,6 @@ def get_ml_performance_tracker() -> MLPerformanceTracker:
 
 def reset_ml_performance_tracker():
     """Reset the global ML performance tracker."""
-    global _ml_tracker
     _ml_tracker = MLPerformanceTracker()
 
 
