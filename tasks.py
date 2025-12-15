@@ -27,7 +27,9 @@ def run_pipeline_task(self, job_id: str, config_request_dict: dict):
 
     try:
         pipeline_service.run(
-            job_id=job_id, config_request=config_request, job_manager=job_manager
+            job_id=job_id,
+            config_request=config_request,
+            job_manager=job_manager,
         )
     except Exception as e:
         log.error(f"Celery task for job {job_id} failed", error=str(e), exc_info=True)

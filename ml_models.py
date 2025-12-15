@@ -44,7 +44,8 @@ class EnhancedFeatureEngineer:
         self.feature_names = []
 
     def extract_comprehensive_features(
-        self, collapsed_df: pd.DataFrame
+        self,
+        collapsed_df: pd.DataFrame,
     ) -> tuple[pd.DataFrame, list[str]]:
         """Extract comprehensive features from collapsed UMI data.
 
@@ -94,14 +95,14 @@ class EnhancedFeatureEngineer:
             features.append(np.log1p(family_sizes).reshape(-1, 1))  # Log transform
             features.append(
                 (family_sizes - np.mean(family_sizes))
-                / (np.std(family_sizes) + 1e-8).reshape(-1, 1)
+                / (np.std(family_sizes) + 1e-8).reshape(-1, 1),
             )  # Z-score
 
         # Quality-based features
         if "quality_score" in collapsed_df.columns:
             quality_scores = collapsed_df["quality_score"].values
             features.append(
-                np.sqrt(quality_scores).reshape(-1, 1)
+                np.sqrt(quality_scores).reshape(-1, 1),
             )  # Square root transform
 
         # Combine all features
@@ -127,7 +128,11 @@ class EnhancedFeatureEngineer:
         return pd.DataFrame(X, columns=self.feature_names), self.feature_names
 
     def select_optimal_features(
-        self, X: pd.DataFrame, y: np.ndarray, method: str = "mutual_info", k: int = None
+        self,
+        X: pd.DataFrame,
+        y: np.ndarray,
+        method: str = "mutual_info",
+        k: int = None,
     ) -> tuple[pd.DataFrame, list[str]]:
         """Select optimal features using multiple methods.
 
@@ -176,7 +181,9 @@ class GradientBoostedVariantCaller:
 
     @ml_performance_decorator
     def train_model(
-        self, collapsed_df: pd.DataFrame, rng: np.random.Generator
+        self,
+        collapsed_df: pd.DataFrame,
+        rng: np.random.Generator,
     ) -> dict[str, Any]:
         """Train gradient-boosted model for variant calling.
 
@@ -191,7 +198,7 @@ class GradientBoostedVariantCaller:
 
         # Extract features and labels
         X, feature_names = self.feature_engineer.extract_comprehensive_features(
-            collapsed_df
+            collapsed_df,
         )
 
         # Use is_variant as target (or generate synthetic labels if not available)
@@ -207,12 +214,14 @@ class GradientBoostedVariantCaller:
 
         # Feature selection
         X_selected, selected_features = self.feature_engineer.select_optimal_features(
-            X, y, method="mutual_info"
+            X,
+            y,
+            method="mutual_info",
         )
         self.selected_features = selected_features
 
         print(
-            f"  Selected {len(selected_features)} features: {selected_features[:5]}{'...' if len(selected_features) > 5 else ''}"
+            f"  Selected {len(selected_features)} features: {selected_features[:5]}{'...' if len(selected_features) > 5 else ''}",
         )
 
         # Scale features
@@ -272,7 +281,9 @@ class GradientBoostedVariantCaller:
 
         threshold_optimizer = AdaptiveThresholdOptimizer(self.config)
         optimal_threshold = threshold_optimizer.optimize_threshold(
-            predictions, y, metric="f1"
+            predictions,
+            y,
+            metric="f1",
         )
 
         # Record performance metrics
@@ -291,7 +302,8 @@ class GradientBoostedVariantCaller:
 
                 model_metrics["test_roc_auc"] = roc_auc_score(y, predictions)
                 model_metrics["test_avg_precision"] = average_precision_score(
-                    y, predictions
+                    y,
+                    predictions,
                 )
             except Exception:
                 pass
@@ -343,12 +355,15 @@ class GradientBoostedVariantCaller:
         return self.model.predict_proba(X_scaled)[:, 1]
 
     def _generate_synthetic_labels(
-        self, collapsed_df: pd.DataFrame, rng: np.random.Generator
+        self,
+        collapsed_df: pd.DataFrame,
+        rng: np.random.Generator,
     ) -> np.ndarray:
         """Generate synthetic labels for training when ground truth is not available."""
         # Use allele fraction as primary signal
         af_signal = collapsed_df.get(
-            "allele_fraction", pd.Series([0.001] * len(collapsed_df))
+            "allele_fraction",
+            pd.Series([0.001] * len(collapsed_df)),
         )
 
         # Add noise based on quality and consensus
@@ -357,7 +372,8 @@ class GradientBoostedVariantCaller:
             / 50.0
         )
         consensus_factor = collapsed_df.get(
-            "consensus_agreement", pd.Series([0.8] * len(collapsed_df))
+            "consensus_agreement",
+            pd.Series([0.8] * len(collapsed_df)),
         )
 
         # Combine signals with more sophisticated modeling
@@ -396,7 +412,7 @@ class GradientBoostedVariantCaller:
                     self.selected_features,
                     self.model.feature_importances_,
                     strict=False,
-                )
+                ),
             )
         elif hasattr(self.model, "coef_"):
             # For linear models
@@ -428,22 +444,29 @@ class EnsembleVariantCaller:
         """Initialize ensemble of different model types."""
         if XGBOOST_AVAILABLE:
             self.models["xgboost"] = GradientBoostedVariantCaller(
-                self.config, "xgboost"
+                self.config,
+                "xgboost",
             )
         if LIGHTGBM_AVAILABLE:
             self.models["lightgbm"] = GradientBoostedVariantCaller(
-                self.config, "lightgbm"
+                self.config,
+                "lightgbm",
             )
 
         # Always include sklearn models as fallback
         self.models["gbm"] = GradientBoostedVariantCaller(self.config, "sklearn_gbm")
         self.models["rf"] = RandomForestClassifier(
-            n_estimators=100, max_depth=10, random_state=self.config.seed, n_jobs=1
+            n_estimators=100,
+            max_depth=10,
+            random_state=self.config.seed,
+            n_jobs=1,
         )
 
     @ml_performance_decorator
     def train_ensemble(
-        self, collapsed_df: pd.DataFrame, rng: np.random.Generator
+        self,
+        collapsed_df: pd.DataFrame,
+        rng: np.random.Generator,
     ) -> dict[str, Any]:
         """Train ensemble of ML models.
 
@@ -458,7 +481,7 @@ class EnsembleVariantCaller:
 
         # Extract features once for all models
         X, feature_names = self.feature_engineer.extract_comprehensive_features(
-            collapsed_df
+            collapsed_df,
         )
 
         # Generate labels
@@ -472,7 +495,8 @@ class EnsembleVariantCaller:
 
         # Feature selection
         X_selected, selected_features = self.feature_engineer.select_optimal_features(
-            X, y
+            X,
+            y,
         )
         self.selected_features = selected_features
 
@@ -499,7 +523,9 @@ class EnsembleVariantCaller:
                     X_scaled,
                     y,
                     cv=StratifiedKFold(
-                        n_splits=3, shuffle=True, random_state=self.config.seed
+                        n_splits=3,
+                        shuffle=True,
+                        random_state=self.config.seed,
                     ),
                     scoring="roc_auc",
                 )
@@ -558,7 +584,9 @@ class EnsembleVariantCaller:
 
         threshold_optimizer = AdaptiveThresholdOptimizer(self.config)
         optimal_threshold = threshold_optimizer.optimize_threshold(
-            ensemble_predictions, y, metric="f1"
+            ensemble_predictions,
+            y,
+            metric="f1",
         )
 
         # Record ensemble performance metrics
@@ -579,10 +607,12 @@ class EnsembleVariantCaller:
                 from sklearn.metrics import average_precision_score, roc_auc_score
 
                 ensemble_metrics["test_roc_auc"] = roc_auc_score(
-                    y, ensemble_predictions
+                    y,
+                    ensemble_predictions,
                 )
                 ensemble_metrics["test_avg_precision"] = average_precision_score(
-                    y, ensemble_predictions
+                    y,
+                    ensemble_predictions,
                 )
             except Exception:
                 pass
