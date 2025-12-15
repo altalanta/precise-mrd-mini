@@ -77,7 +77,7 @@ class StreamingMRDPipeline:
     async def process_streaming_data(self):
         """Process data from Kafka stream."""
         self.logger.info(
-            f"Starting streaming pipeline. Listening to topic: {self.input_topic}"
+            f"Starting streaming pipeline. Listening to topic: {self.input_topic}",
         )
 
         try:
@@ -94,7 +94,7 @@ class StreamingMRDPipeline:
                     self.producer.send(self.output_topic, key=message.key, value=result)
 
                     self.logger.info(
-                        f"Processed and sent result for key: {message.key}"
+                        f"Processed and sent result for key: {message.key}",
                     )
 
                 except Exception as e:
@@ -123,7 +123,8 @@ class StreamingMRDPipeline:
             self.consumer.close()
 
     async def _process_single_sample(
-        self, input_data: dict[str, Any]
+        self,
+        input_data: dict[str, Any],
     ) -> dict[str, Any]:
         """Process a single sample from the stream.
 
@@ -260,7 +261,9 @@ class StreamingMRDPipeline:
             raise
 
     def get_processing_results(
-        self, sample_id: str, timeout_seconds: int = 300
+        self,
+        sample_id: str,
+        timeout_seconds: int = 300,
     ) -> dict[str, Any] | None:
         """Get processing results for a specific sample.
 
@@ -331,7 +334,9 @@ class BatchStreamingPipeline:
         self.logger = logging.getLogger(__name__)
 
     async def process_batch(
-        self, samples: list[dict[str, Any]], config: PipelineConfig
+        self,
+        samples: list[dict[str, Any]],
+        config: PipelineConfig,
     ) -> dict[str, Any]:
         """Process a batch of samples.
 
@@ -373,7 +378,8 @@ class BatchStreamingPipeline:
                     if "custom_config" in sample_data:
                         # Merge custom config with base config
                         sample_config = self._merge_configs(
-                            config, sample_data["custom_config"]
+                            config,
+                            sample_data["custom_config"],
                         )
 
                     reads_df = simulate_reads(sample_config, rng)
@@ -458,7 +464,7 @@ class BatchStreamingPipeline:
             self.producer.send(self.output_topic, key=batch_id, value=results)
 
             self.logger.info(
-                f"Batch {batch_id} completed in {results['total_processing_time']:.2f}s"
+                f"Batch {batch_id} completed in {results['total_processing_time']:.2f}s",
             )
 
             return results
@@ -476,7 +482,9 @@ class BatchStreamingPipeline:
             raise
 
     def _merge_configs(
-        self, base_config: PipelineConfig, custom_config: dict[str, Any]
+        self,
+        base_config: PipelineConfig,
+        custom_config: dict[str, Any],
     ) -> PipelineConfig:
         """Merge base configuration with custom overrides."""
         # Simplified config merging - in production, you'd want more sophisticated merging
