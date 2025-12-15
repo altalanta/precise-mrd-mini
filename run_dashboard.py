@@ -56,7 +56,11 @@ def get_job_status(job_id: str) -> dict[str, Any] | None:
 
 
 def submit_job(
-    run_id: str, seed: int, use_parallel: bool, use_ml: bool, use_dl: bool
+    run_id: str,
+    seed: int,
+    use_parallel: bool,
+    use_ml: bool,
+    use_dl: bool,
 ) -> dict[str, Any] | None:
     """Submit a new job to the API."""
     form_data = {
@@ -169,7 +173,7 @@ def render_sidebar():
                         result = submit_job(run_id, seed, use_parallel, use_ml, use_dl)
                         if result:
                             st.success(
-                                f"Job '{result['job_id']}' submitted successfully!"
+                                f"Job '{result['job_id']}' submitted successfully!",
                             )
                             st.session_state.selected_job_id = result["job_id"]
                             st.rerun()
@@ -187,7 +191,8 @@ def render_job_list():
 
     df = pd.DataFrame(jobs_data)
     df["run_id"] = df.apply(
-        lambda row: row.get("run_id") or f"Job_{row['job_id']}", axis=1
+        lambda row: row.get("run_id") or f"Job_{row['job_id']}",
+        axis=1,
     )
     df = df[["job_id", "status", "progress", "run_id", "created_at"]]
     df["created_at"] = pd.to_datetime(df["created_at"]).dt.strftime("%Y-%m-%d %H:%M:%S")
@@ -263,7 +268,7 @@ def render_job_details():
 
     elif status_data["status"] not in ["completed", "failed"]:
         st.info(
-            "Job is running. Status will update in real-time. Results will be shown upon completion."
+            "Job is running. Status will update in real-time. Results will be shown upon completion.",
         )
 
 
@@ -277,7 +282,7 @@ def main():
     if not get_api_health():
         st.error(
             "**API is not available.** Please ensure the FastAPI server is running."
-            "\n\nYou can start it by running `uv run src.precise_mrd.api:create_api_app --factory --reload` in your terminal."
+            "\n\nYou can start it by running `uv run src.precise_mrd.api:create_api_app --factory --reload` in your terminal.",
         )
         return
 
