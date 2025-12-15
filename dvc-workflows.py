@@ -17,7 +17,11 @@ def run_dvc_command(cmd, stage_name=None):
         print(f"Running DVC stage: {stage_name}")
     try:
         result = subprocess.run(
-            cmd, shell=True, check=True, capture_output=True, text=True
+            cmd,
+            shell=True,
+            check=True,
+            capture_output=True,
+            text=True,
         )
         print(f"✅ {stage_name or cmd} completed successfully")
         return result
