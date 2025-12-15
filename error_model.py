@@ -35,20 +35,23 @@ def _get_cache_key(config: PipelineConfig, collapsed_df: pd.DataFrame) -> str:
 
 
 def _load_cached_error_model(
-    cache_key: str, cache_dir: str = ".cache"
+    cache_key: str,
+    cache_dir: str = ".cache",
 ) -> pd.DataFrame | None:
     """Load cached error model if it exists."""
     cache_path = Path(cache_dir) / f"error_model_{cache_key}.parquet"
     if cache_path.exists():
         try:
             return pd.read_parquet(cache_path)
-        except Exception:
+        except (OSError, ValueError, ImportError):
             return None
     return None
 
 
 def _save_cached_error_model(
-    error_df: pd.DataFrame, cache_key: str, cache_dir: str = ".cache"
+    error_df: pd.DataFrame,
+    cache_key: str,
+    cache_dir: str = ".cache",
 ) -> None:
     """Save error model to cache."""
     cache_path = Path(cache_dir) / f"error_model_{cache_key}.parquet"
@@ -57,7 +60,7 @@ def _save_cached_error_model(
 
 
 @pa.check_input(
-    pa.DataFrameSchema(CollapsedUmisSchema.to_schema().columns, strict=False)
+    pa.DataFrameSchema(CollapsedUmisSchema.to_schema().columns, strict=False),
 )
 @pa.check_output(ErrorModelSchema)
 def fit_error_model(
@@ -112,7 +115,7 @@ def fit_error_model(
                     "n_observations": params["n_observations"],
                     "model_type": "bayesian",
                     "config_hash": params.get("config_hash", config.config_hash()),
-                }
+                },
             )
 
         df = pd.DataFrame(error_data)
@@ -244,7 +247,7 @@ def fit_error_model(
                 "ci_upper": ci_upper,
                 "n_observations": len(negative_samples),
                 "config_hash": config.config_hash(),
-            }
+            },
         )
 
     df = pd.DataFrame(error_data)

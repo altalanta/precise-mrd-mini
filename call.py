@@ -2,21 +2,25 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import mlflow
-import numpy as np
-import pandas as pd
 import pandera as pa
 
-from .config import PipelineConfig
-from .data_schemas import (
-    CollapsedUmisSchema,
-    ErrorModelSchema,
-    MLCallsSchema,
-)
-from .models.base import VariantCaller
-from .models.deep_learning import DLVariantCaller
-from .models.machine_learning import MLVariantCaller
-from .models.statistical import StatisticalVariantCaller
+if TYPE_CHECKING:
+    import numpy as np
+    import pandas as pd
+
+    from .config import PipelineConfig
+    from .data_schemas import (
+        CollapsedUmisSchema,
+        ErrorModelSchema,
+        MLCallsSchema,
+    )
+    from .models.base import VariantCaller
+    from .models.deep_learning import DLVariantCaller
+    from .models.machine_learning import MLVariantCaller
+    from .models.statistical import StatisticalVariantCaller
 
 
 def get_variant_caller(
@@ -91,7 +95,8 @@ def predict_from_model(
     # For now, we use a default.
     client = mlflow.tracking.MlflowClient()
     model_version = client.get_model_version_by_alias(
-        name=model_uri.split("/")[1], alias="latest"
+        name=model_uri.split("/")[1],
+        alias="latest",
     )  # Simplified
     run_info = client.get_run(model_version.run_id)
     optimal_threshold = float(run_info.data.metrics.get("optimal_threshold", 0.5))

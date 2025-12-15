@@ -47,7 +47,7 @@ def _bootstrap_worker(args):
 
     try:
         return metric_func(boot_y_true, boot_y_score)
-    except Exception:
+    except (ValueError, ZeroDivisionError, RuntimeError):
         return None
 
 
@@ -97,7 +97,8 @@ def bootstrap_metric(
             # Submit all tasks and maintain deterministic order
             future_to_indices = {
                 executor.submit(
-                    _bootstrap_worker, (y_true, y_score, indices, metric_func)
+                    _bootstrap_worker,
+                    (y_true, y_score, indices, metric_func),
                 ): i
                 for i, indices in enumerate(bootstrap_indices)
             }
@@ -126,7 +127,9 @@ def bootstrap_metric(
 
 
 def calibration_analysis(
-    y_true: np.ndarray, y_prob: np.ndarray, n_bins: int = 10
+    y_true: np.ndarray,
+    y_prob: np.ndarray,
+    n_bins: int = 10,
 ) -> list[dict[str, Any]]:
     """Analyze prediction calibration.
 
@@ -166,7 +169,7 @@ def calibration_analysis(
                 "count": int(bin_count),
                 "event_rate": float(bin_event_rate),
                 "confidence": float(bin_confidence),
-            }
+            },
         )
 
     return calibration_data
@@ -236,12 +239,18 @@ def calculate_metrics(
 
         # Advanced bootstrap CI for ROC AUC
         roc_ci = adv_ci.bootstrap_confidence_interval(
-            y_score, lambda x: roc_auc_score(y_true, x), n_bootstrap, rng
+            y_score,
+            lambda x: roc_auc_score(y_true, x),
+            n_bootstrap,
+            rng,
         )
 
         # Advanced bootstrap CI for Average Precision
         ap_ci = adv_ci.bootstrap_confidence_interval(
-            y_score, lambda x: average_precision(y_true, x), n_bootstrap, rng
+            y_score,
+            lambda x: average_precision(y_true, x),
+            n_bootstrap,
+            rng,
         )
 
         # Add method information
@@ -250,10 +259,20 @@ def calculate_metrics(
     else:
         # Standard bootstrap CI (parallel processing)
         roc_ci = bootstrap_metric(
-            y_true, y_score, roc_auc_score, n_bootstrap, rng, n_jobs
+            y_true,
+            y_score,
+            roc_auc_score,
+            n_bootstrap,
+            rng,
+            n_jobs,
         )
         ap_ci = bootstrap_metric(
-            y_true, y_score, average_precision, n_bootstrap, rng, n_jobs
+            y_true,
+            y_score,
+            average_precision,
+            n_bootstrap,
+            rng,
+            n_jobs,
         )
 
     # Detection statistics
@@ -290,7 +309,8 @@ def calculate_metrics(
                 from sklearn.ensemble import RandomForestClassifier
 
                 model = RandomForestClassifier(
-                    n_estimators=10, random_state=config.seed
+                    n_estimators=10,
+                    random_state=config.seed,
                 )
                 model.fit(X_train, y_train)
                 return model
@@ -303,7 +323,8 @@ def calculate_metrics(
         if "ml_probability" in calls_df.columns:
             calibrator = ModelValidator(config)
             calibration_results = calibrator.calibration_analysis(
-                y_true, calls_df["ml_probability"].values
+                y_true,
+                calls_df["ml_probability"].values,
             )
             validation_results["calibration_analysis"] = calibration_results
 

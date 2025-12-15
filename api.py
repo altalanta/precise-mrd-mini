@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import tempfile
 import time
-from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
 
 import uvicorn
 from fastapi import (
@@ -23,10 +25,18 @@ from fastapi import (
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 from .celery_app import celery_app
-from .config import ConfigValidator, PipelineConfig, dump_config, load_config
+from .config import (
+    ConfigValidator,
+    PipelineConfig,
+    PredefinedTemplates,
+    dump_config,
+    load_config,
+)
 from .database import async_engine, get_async_db, init_db
 from .enums import HealthStatusEnum, JobStatusEnum
 from .exceptions import ConfigurationError
@@ -93,7 +103,7 @@ class ConnectionManager:
         if job_id not in self.active_connections:
             self.active_connections[job_id] = []
         self.active_connections[job_id].append(websocket)
-        log.info(f"WebSocket connected for job_id: {job_id}")
+        log.info("WebSocket connected for job_id: %s", job_id)
 
     def disconnect(self, websocket: WebSocket, job_id: str):
         """Disconnects a WebSocket and removes it from the active connections."""
@@ -101,7 +111,7 @@ class ConnectionManager:
             self.active_connections[job_id].remove(websocket)
             if not self.active_connections[job_id]:
                 del self.active_connections[job_id]
-        log.info(f"WebSocket disconnected for job_id: {job_id}")
+        log.info("WebSocket disconnected for job_id: %s", job_id)
 
     async def broadcast(self, job_id: str, message: dict[str, Any]):
         """Broadcasts a message to all clients connected for a specific job_id."""
@@ -194,7 +204,7 @@ async def get_health_status(db: AsyncSession = Depends(get_async_db)):
         if row != 1:
             db_status = HealthStatusEnum.ERROR
             db_message = f"Database returned unexpected value: {row}"
-    except Exception as e:
+    except (OSError, ConnectionError, TimeoutError) as e:
         db_status = HealthStatusEnum.ERROR
         db_message = f"Database connection failed: {type(e).__name__}: {e}"
     db_response_time = (time.perf_counter() - db_start) * 1000
@@ -205,7 +215,7 @@ async def get_health_status(db: AsyncSession = Depends(get_async_db)):
             status=db_status,
             message=db_message,
             response_time_ms=round(db_response_time, 2),
-        )
+        ),
     )
 
     # Redis health check with timing
@@ -216,7 +226,7 @@ async def get_health_status(db: AsyncSession = Depends(get_async_db)):
         # Perform a simple ping to check Redis connection
         # Note: This is a sync call; for high-traffic APIs consider using aioredis
         celery_app.backend.client.ping()
-    except Exception as e:
+    except (OSError, ConnectionError, TimeoutError) as e:
         redis_status = HealthStatusEnum.ERROR
         redis_message = f"Redis connection failed: {type(e).__name__}: {e}"
     redis_response_time = (time.perf_counter() - redis_start) * 1000
@@ -227,7 +237,7 @@ async def get_health_status(db: AsyncSession = Depends(get_async_db)):
             status=redis_status,
             message=redis_message,
             response_time_ms=round(redis_response_time, 2),
-        )
+        ),
     )
 
     # Determine overall status
@@ -290,10 +300,12 @@ async def submit_pipeline_job(
         description="Enable parallel processing for performance improvement on multi-core systems.",
     ),
     use_ml_calling: bool = Form(
-        False, description="Enable the machine learning-based variant calling model."
+        False,
+        description="Enable the machine learning-based variant calling model.",
     ),
     use_deep_learning: bool = Form(
-        False, description="Enable the deep learning (CNN-LSTM) variant calling model."
+        False,
+        description="Enable the deep learning (CNN-LSTM) variant calling model.",
     ),
     ml_model_type: str = Form(
         "ensemble",
@@ -333,11 +345,13 @@ async def submit_pipeline_job(
 
     except ConfigurationError as e:
         raise HTTPException(
-            status_code=400, detail=f"Invalid configuration provided: {e}"
+            status_code=400,
+            detail=f"Invalid configuration provided: {e}",
         ) from e
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Failed to submit job: {str(e)}"
+            status_code=500,
+            detail=f"Failed to submit job: {str(e)}",
         ) from e
 
 
@@ -349,7 +363,8 @@ async def submit_pipeline_job(
     tags=["Jobs"],
 )
 async def get_job_status(
-    job_id: str, job_manager: AsyncJobManager = Depends(get_async_job_manager)
+    job_id: str,
+    job_manager: AsyncJobManager = Depends(get_async_job_manager),
 ):
     """Get the status of a pipeline job."""
     job = await job_manager.get_job(job_id)
@@ -376,14 +391,16 @@ async def get_job_status(
     tags=["Jobs"],
 )
 async def get_job_results(
-    job_id: str, job_manager: AsyncJobManager = Depends(get_async_job_manager)
+    job_id: str,
+    job_manager: AsyncJobManager = Depends(get_async_job_manager),
 ):
     """Get the results of a completed pipeline job."""
     job = await job_manager.get_job(job_id)
 
     if not job or job.status == JobStatusEnum.PENDING:
         raise HTTPException(
-            status_code=404, detail="Job not found or not yet submitted"
+            status_code=404,
+            detail="Job not found or not yet submitted",
         )
 
     if job.status == JobStatusEnum.RUNNING:
@@ -420,7 +437,8 @@ async def download_artifact(
     artifacts = results.get("artifacts", {}) if results else {}
     if artifact_type not in artifacts:
         raise HTTPException(
-            status_code=404, detail=f"Artifact type '{artifact_type}' not found"
+            status_code=404,
+            detail=f"Artifact type '{artifact_type}' not found",
         )
 
     artifact_path = artifacts[artifact_type]
@@ -474,7 +492,8 @@ async def list_jobs(
 )
 async def validate_configuration(
     config_yaml: str = Form(
-        ..., description="The YAML configuration string to validate."
+        ...,
+        description="The YAML configuration string to validate.",
     ),
 ):
     """Validate a pipeline configuration."""
@@ -495,11 +514,13 @@ async def validate_configuration(
 
     except ConfigurationError as e:
         raise HTTPException(
-            status_code=400, detail=f"Configuration validation failed: {e}"
+            status_code=400,
+            detail=f"Configuration validation failed: {e}",
         ) from e
     except Exception as e:
         raise HTTPException(
-            status_code=400, detail=f"Configuration validation failed: {str(e)}"
+            status_code=400,
+            detail=f"Configuration validation failed: {str(e)}",
         ) from e
 
 
@@ -512,8 +533,6 @@ async def validate_configuration(
 )
 async def get_config_templates():
     """Get available configuration templates."""
-    from .config import PredefinedTemplates
-
     templates = [
         PredefinedTemplates.get_smoke_test_template(),
         PredefinedTemplates.get_production_template(),
@@ -531,16 +550,16 @@ async def get_config_templates():
 )
 async def create_config_from_template(
     template_name: str = Form(
-        ..., description="The name of the template to use (e.g., 'smoke_test')."
+        ...,
+        description="The name of the template to use (e.g., 'smoke_test').",
     ),
     run_id: str = Form(
-        ..., description="The unique run identifier to embed in the configuration."
+        ...,
+        description="The unique run identifier to embed in the configuration.",
     ),
     seed: int = Form(7, description="The random seed to embed in the configuration."),
 ):
     """Create configuration from template."""
-    from .config import PredefinedTemplates
-
     template = None
     if template_name == "smoke_test":
         template = PredefinedTemplates.get_smoke_test_template()
@@ -548,7 +567,8 @@ async def create_config_from_template(
         template = PredefinedTemplates.get_production_template()
     else:
         raise HTTPException(
-            status_code=400, detail=f"Unknown template: {template_name}"
+            status_code=400,
+            detail=f"Unknown template: {template_name}",
         )
     try:
         config = PipelineConfig.from_template(template, run_id)
@@ -565,7 +585,8 @@ async def create_config_from_template(
         }
     except Exception as e:
         raise HTTPException(
-            status_code=400, detail=f"Failed to create config from template: {e}"
+            status_code=400,
+            detail=f"Failed to create config from template: {e}",
         ) from e
 
 
@@ -577,7 +598,11 @@ def create_api_app() -> FastAPI:
 def run_api_server(host: str = "0.0.0.0", port: int = 8000, reload: bool = False):
     """Run the API server."""
     uvicorn.run(
-        "precise_mrd.api:app", host=host, port=port, reload=reload, access_log=True
+        "precise_mrd.api:app",
+        host=host,
+        port=port,
+        reload=reload,
+        access_log=True,
     )
 
 

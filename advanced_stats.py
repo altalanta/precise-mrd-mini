@@ -2,16 +2,18 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
-import pandas as pd
 from scipy import stats
 from sklearn.ensemble import IsolationForest, RandomForestClassifier
 from sklearn.model_selection import cross_val_score
 from sklearn.preprocessing import StandardScaler
 
-from .config import PipelineConfig
+if TYPE_CHECKING:
+    import pandas as pd
+
+    from .config import PipelineConfig
 
 
 class BayesianErrorModel:
@@ -87,7 +89,9 @@ class BayesianErrorModel:
         ]
 
     def fit_bayesian_model(
-        self, collapsed_df: pd.DataFrame, rng: np.random.Generator
+        self,
+        collapsed_df: pd.DataFrame,
+        rng: np.random.Generator,
     ) -> dict[str, Any]:
         """Fit Bayesian hierarchical model to error rates.
 
@@ -130,7 +134,7 @@ class BayesianErrorModel:
                 posterior_mean = alpha_post / (alpha_post + beta_post)
                 posterior_std = np.sqrt(
                     (alpha_post * beta_post)
-                    / ((alpha_post + beta_post) ** 2 * (alpha_post + beta_post + 1))
+                    / ((alpha_post + beta_post) ** 2 * (alpha_post + beta_post + 1)),
                 )
 
                 # 95% credible interval
@@ -157,7 +161,9 @@ class BayesianErrorModel:
         }
 
     def _fit_simple_model(
-        self, collapsed_df: pd.DataFrame, rng: np.random.Generator
+        self,
+        collapsed_df: pd.DataFrame,
+        rng: np.random.Generator,
     ) -> dict[str, Any]:
         """Fallback simple error model."""
         # Simplified fallback when no negative controls available
@@ -194,7 +200,8 @@ class MLVariantCaller:
             n_jobs=1,  # Deterministic
         )
         self.outlier_detector = IsolationForest(
-            random_state=config.seed, contamination=0.1
+            random_state=config.seed,
+            contamination=0.1,
         )
 
     def extract_features(self, collapsed_df: pd.DataFrame) -> np.ndarray:
@@ -236,7 +243,9 @@ class MLVariantCaller:
         return np.array(features)
 
     def train_classifier(
-        self, collapsed_df: pd.DataFrame, rng: np.random.Generator
+        self,
+        collapsed_df: pd.DataFrame,
+        rng: np.random.Generator,
     ) -> dict[str, Any]:
         """Train ML classifier for variant calling.
 
@@ -272,7 +281,11 @@ class MLVariantCaller:
 
         # Cross-validation performance
         cv_scores = cross_val_score(
-            self.variant_classifier, X_scaled, y, cv=3, scoring="accuracy"
+            self.variant_classifier,
+            X_scaled,
+            y,
+            cv=3,
+            scoring="accuracy",
         )
 
         # Feature importance
@@ -348,7 +361,7 @@ class AdvancedConfidenceIntervals:
             try:
                 stat = statistic_func(bootstrap_sample)
                 bootstrap_stats.append(stat)
-            except Exception:
+            except (ValueError, TypeError, RuntimeError):
                 continue
 
         if not bootstrap_stats:
