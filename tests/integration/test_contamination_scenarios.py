@@ -56,7 +56,10 @@ class TestContaminationIntegration:
             output_path = temp_dir / f"hop_{hop_rate}"
 
             result = self._run_pipeline_with_contamination(
-                config, output_path, contamination_type="index_hopping", rate=hop_rate
+                config,
+                output_path,
+                contamination_type="index_hopping",
+                rate=hop_rate,
             )
             results.append(result)
 
@@ -84,7 +87,10 @@ class TestContaminationIntegration:
             output_path = temp_dir / f"carryover_{rate}"
 
             result = self._run_pipeline_with_contamination(
-                config, output_path, contamination_type="carryover", rate=rate
+                config,
+                output_path,
+                contamination_type="carryover",
+                rate=rate,
             )
 
             # Validate carryover impact
@@ -138,7 +144,10 @@ class TestContaminationIntegration:
             output_path = temp_dir / f"umi_{threshold}"
 
             result = self._run_pipeline_with_contamination(
-                config, output_path, contamination_type="index_hopping", rate=0.001
+                config,
+                output_path,
+                contamination_type="index_hopping",
+                rate=0.001,
             )
 
             # Validate UMI filtering effectiveness
@@ -170,7 +179,10 @@ class TestContaminationIntegration:
             output_path = temp_dir / f"subtraction_{method}"
 
             result = self._run_pipeline_with_background_subtraction(
-                config, output_path, method, background_rate=0.001
+                config,
+                output_path,
+                method,
+                background_rate=0.001,
             )
 
             # Validate subtraction method effectiveness
@@ -228,7 +240,10 @@ class TestContaminationIntegration:
         }
 
     def _apply_index_hopping(
-        self, reads_df: pd.DataFrame, rate: float, rng: np.random.Generator
+        self,
+        reads_df: pd.DataFrame,
+        rate: float,
+        rng: np.random.Generator,
     ) -> pd.DataFrame:
         """Apply index hopping contamination to reads."""
         contaminated_df = reads_df.copy()
@@ -253,7 +268,10 @@ class TestContaminationIntegration:
         return contaminated_df
 
     def _apply_carryover(
-        self, reads_df: pd.DataFrame, rate: float, rng: np.random.Generator
+        self,
+        reads_df: pd.DataFrame,
+        rate: float,
+        rng: np.random.Generator,
     ) -> pd.DataFrame:
         """Apply sample carryover contamination to reads."""
         contaminated_df = reads_df.copy()
@@ -282,7 +300,8 @@ class TestContaminationIntegration:
                 carryover_read["family_id"] = f"carryover_{rng.integers(1000000)}"
 
                 contaminated_df = pd.concat(
-                    [contaminated_df, pd.DataFrame([carryover_read])], ignore_index=True
+                    [contaminated_df, pd.DataFrame([carryover_read])],
+                    ignore_index=True,
                 )
 
         return contaminated_df
@@ -319,7 +338,9 @@ class TestContaminationIntegration:
         )
 
     def _validate_multiplex_results(
-        self, result: dict, contamination_matrix: np.ndarray
+        self,
+        result: dict,
+        contamination_matrix: np.ndarray,
     ):
         """Validate multiplexed sample results."""
         calls_df = result["calls_df"]
@@ -389,14 +410,19 @@ class TestContaminationMitigation:
             output_path = temp_dir / f"dedup_{method}"
 
             result = self._run_pipeline_with_deduplication(
-                config, output_path, deduplication_method=method
+                config,
+                output_path,
+                deduplication_method=method,
             )
 
             # Validate deduplication effectiveness
             self._validate_deduplication_method(result, method)
 
     def _run_pipeline_with_deduplication(
-        self, config: PipelineConfig, output_path: Path, deduplication_method: str
+        self,
+        config: PipelineConfig,
+        output_path: Path,
+        deduplication_method: str,
     ) -> dict:
         """Run pipeline with specified deduplication method."""
         set_global_seed(config.seed)

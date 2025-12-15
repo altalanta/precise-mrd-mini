@@ -182,7 +182,7 @@ def run_full_integration_suite():
 
     print(f"\n{'=' * 50}")
     print(
-        f"🎯 Integration Test Suite Summary: {total_passed}/{total_tests} test suites passed"
+        f"🎯 Integration Test Suite Summary: {total_passed}/{total_tests} test suites passed",
     )
 
     return total_passed == total_tests
@@ -237,7 +237,7 @@ def run_specific_test_category(category: str):
 def main():
     """Main CLI interface for integration tests."""
     parser = argparse.ArgumentParser(
-        description="Run integration tests for Precise MRD"
+        description="Run integration tests for Precise MRD",
     )
     parser.add_argument(
         "category",
@@ -254,7 +254,9 @@ def main():
         help="Test category to run",
     )
     parser.add_argument(
-        "--list", action="store_true", help="List available test categories"
+        "--list",
+        action="store_true",
+        help="List available test categories",
     )
 
     args = parser.parse_args()

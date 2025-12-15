@@ -21,10 +21,16 @@ def _sorted_strict_floats(min_value: float, max_value: float, size: int) -> list
 
 @given(
     alpha=st.floats(
-        min_value=0.01, max_value=0.1, allow_nan=False, allow_infinity=False
+        min_value=0.01,
+        max_value=0.1,
+        allow_nan=False,
+        allow_infinity=False,
     ),
     true_rate=st.floats(
-        min_value=1e-4, max_value=5e-3, allow_nan=False, allow_infinity=False
+        min_value=1e-4,
+        max_value=5e-3,
+        allow_nan=False,
+        allow_infinity=False,
     ),
     n_trials=st.integers(min_value=200, max_value=1500),
 )
@@ -57,7 +63,10 @@ def test_poisson_type_i_control(alpha: float, true_rate: float, n_trials: int) -
         max_size=20,
     ),
     alpha=st.floats(
-        min_value=0.01, max_value=0.2, allow_nan=False, allow_infinity=False
+        min_value=0.01,
+        max_value=0.2,
+        allow_nan=False,
+        allow_infinity=False,
     ),
 )
 @settings(max_examples=25, deadline=None)
@@ -80,7 +89,10 @@ def test_bh_adjusted_p_monotonic(p_values: list[float], alpha: float) -> None:
         unique=True,
     ),
     improvement=st.floats(
-        min_value=0.0, max_value=0.15, allow_nan=False, allow_infinity=False
+        min_value=0.0,
+        max_value=0.15,
+        allow_nan=False,
+        allow_infinity=False,
     ),
 )
 @settings(max_examples=10, deadline=None)
@@ -109,7 +121,7 @@ def test_lod_monotonic_depth(base_hits: list[float], improvement: float) -> None
         min_size=5,
         max_size=6,
         unique=True,
-    )
+    ),
 )
 @settings(max_examples=10, deadline=None)
 def test_bootstrap_interval_contains_estimate(base_hits: list[float]) -> None:
@@ -137,15 +149,23 @@ def test_bootstrap_interval_contains_estimate(base_hits: list[float]) -> None:
         unique=True,
     ),
     base_sensitivity=st.floats(
-        min_value=0.4, max_value=0.95, allow_nan=False, allow_infinity=False
+        min_value=0.4,
+        max_value=0.95,
+        allow_nan=False,
+        allow_infinity=False,
     ),
     decay=st.floats(
-        min_value=0.0, max_value=0.2, allow_nan=False, allow_infinity=False
+        min_value=0.0,
+        max_value=0.2,
+        allow_nan=False,
+        allow_infinity=False,
     ),
 )
 @settings(max_examples=10, deadline=None)
 def test_contamination_monotonicity(
-    hop_rates: list[float], base_sensitivity: float, decay: float
+    hop_rates: list[float],
+    base_sensitivity: float,
+    decay: float,
 ) -> None:
     """Synthetic contamination results should become worse with higher hop rates."""
 
@@ -169,7 +189,8 @@ def test_contamination_monotonicity(
         results["index_hopping"][hop_rate] = rate_results
 
     simulator = ContaminationSimulator(
-        create_minimal_config(3), np.random.default_rng(3)
+        create_minimal_config(3),
+        np.random.default_rng(3),
     )
     matrix = simulator._create_sensitivity_matrix(results, af_values, depth_values)
     hop_matrix = np.array(matrix["index_hopping"]["matrix"])

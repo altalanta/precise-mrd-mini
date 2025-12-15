@@ -188,7 +188,9 @@ class TestDeterministicBehavior:
             output_path = temp_dir / f"rng_{rng_info['method']}"
 
             result = self._run_pipeline_with_rng(
-                config, output_path, rng_info["generator"]
+                config,
+                output_path,
+                rng_info["generator"],
             )
             results.append(result)
 
@@ -199,7 +201,10 @@ class TestDeterministicBehavior:
             )
 
     def _run_pipeline(
-        self, config: PipelineConfig, output_path: Path, seed: int
+        self,
+        config: PipelineConfig,
+        output_path: Path,
+        seed: int,
     ) -> dict:
         """Run complete pipeline with given configuration."""
         set_global_seed(seed)
@@ -243,7 +248,10 @@ class TestDeterministicBehavior:
         }
 
     def _run_pipeline_with_rng(
-        self, config: PipelineConfig, output_path: Path, rng_generator
+        self,
+        config: PipelineConfig,
+        output_path: Path,
+        rng_generator,
     ) -> dict:
         """Run pipeline with specific random number generator."""
         # Use provided RNG generator instead of default
