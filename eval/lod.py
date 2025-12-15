@@ -87,7 +87,7 @@ class LODAnalyzer:
         }
 
         print(
-            f"LoB estimated: {lob_value:.3f} (mean: {blank_mean:.3f}, std: {blank_std:.3f})"
+            f"LoB estimated: {lob_value:.3f} (mean: {blank_mean:.3f}, std: {blank_std:.3f})",
         )
         return self.lob_results
 
@@ -139,7 +139,7 @@ class LODAnalyzer:
 
                 for rep in range(n_replicates):
                     run_rng = np.random.default_rng(
-                        self.config.seed + rep * 1000 + int(af * 1e6)
+                        self.config.seed + rep * 1000 + int(af * 1e6),
                     )
 
                     # Create config for this AF/depth
@@ -161,12 +161,17 @@ class LODAnalyzer:
 
             # Fit logistic curve to hit rate vs AF
             lod_af = self._fit_detection_curve(
-                af_tested, hit_rates, target_detection_rate
+                af_tested,
+                hit_rates,
+                target_detection_rate,
             )
 
             # Compute confidence intervals using bootstrap
             lod_ci = self._bootstrap_lod_ci(
-                af_tested, hit_rates, target_detection_rate, n_bootstrap=200
+                af_tested,
+                hit_rates,
+                target_detection_rate,
+                n_bootstrap=200,
             )
 
             lod_results[depth] = {
@@ -180,7 +185,7 @@ class LODAnalyzer:
             }
 
             print(
-                f"    LoD at depth {depth}: {lod_af:.2e} AF [{lod_ci[0]:.2e}, {lod_ci[1]:.2e}]"
+                f"    LoD at depth {depth}: {lod_af:.2e} AF [{lod_ci[0]:.2e}, {lod_ci[1]:.2e}]",
             )
 
         self.lod_results = {
@@ -239,7 +244,7 @@ class LODAnalyzer:
 
                 for rep in range(n_replicates):
                     run_rng = np.random.default_rng(
-                        self.config.seed + rep * 2000 + int(af * 1e6)
+                        self.config.seed + rep * 2000 + int(af * 1e6),
                     )
 
                     # Create config for this AF/depth
@@ -255,7 +260,7 @@ class LODAnalyzer:
                     if not calls_df.empty:
                         # Simple AF estimation: variants detected / total UMIs
                         estimated_af = len(calls_df[calls_df["variant_call"]]) / len(
-                            calls_df
+                            calls_df,
                         )
                         estimated_afs.append(estimated_af)
                     else:
@@ -372,7 +377,10 @@ class LODAnalyzer:
         return lod_config
 
     def _fit_detection_curve(
-        self, af_values: list[float], hit_rates: list[float], target_rate: float = 0.95
+        self,
+        af_values: list[float],
+        hit_rates: list[float],
+        target_rate: float = 0.95,
     ) -> float:
         """Fit logistic curve to detection data and find LoD."""
         # Convert to log scale for fitting
@@ -402,7 +410,10 @@ class LODAnalyzer:
 
             if len(af_values) > 1:
                 interp_func = interp1d(
-                    hit_rates, af_values, bounds_error=False, fill_value="extrapolate"
+                    hit_rates,
+                    af_values,
+                    bounds_error=False,
+                    fill_value="extrapolate",
                 )
                 return float(interp_func(target_rate))
             else:
@@ -453,7 +464,7 @@ class LODAnalyzer:
                     "lod_ci_upper": results["lod_ci_upper"],
                     "target_detection_rate": results["target_detection_rate"],
                     "n_replicates": results["n_replicates"],
-                }
+                },
             )
 
         lod_df = pd.DataFrame(lod_data)
@@ -476,7 +487,7 @@ class LODAnalyzer:
                     "cv_threshold": results["cv_threshold"],
                     "abs_error_threshold": results["abs_error_threshold"],
                     "n_replicates": results["n_replicates"],
-                }
+                },
             )
 
         loq_df = pd.DataFrame(loq_data)
@@ -548,7 +559,9 @@ class LODAnalyzer:
 
 
 def estimate_lob(
-    config: PipelineConfig, rng: np.random.Generator, n_blank_runs: int = 100
+    config: PipelineConfig,
+    rng: np.random.Generator,
+    n_blank_runs: int = 100,
 ) -> dict[str, Any]:
     """Convenience function to estimate LoB."""
     analyzer = LODAnalyzer(config, rng)

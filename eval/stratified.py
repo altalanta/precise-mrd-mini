@@ -66,7 +66,7 @@ class StratifiedAnalyzer:
 
                     for rep in range(n_replicates):
                         run_rng = np.random.default_rng(
-                            self.config.seed + rep * 1000 + hash(context) % 1000
+                            self.config.seed + rep * 1000 + hash(context) % 1000,
                         )
 
                         # Create context-specific config
@@ -74,14 +74,21 @@ class StratifiedAnalyzer:
 
                         # Run pipeline with context tagging
                         reads_df = self._simulate_with_context(
-                            context_config, run_rng, context
+                            context_config,
+                            run_rng,
+                            context,
                         )
                         collapsed_df = collapse_umis(reads_df, context_config, run_rng)
                         error_model = fit_error_model(
-                            collapsed_df, context_config, run_rng
+                            collapsed_df,
+                            context_config,
+                            run_rng,
                         )
                         calls_df = call_mrd(
-                            collapsed_df, error_model, context_config, run_rng
+                            collapsed_df,
+                            error_model,
+                            context_config,
+                            run_rng,
                         )
 
                         # Calculate detection rate for this context
@@ -90,7 +97,7 @@ class StratifiedAnalyzer:
                                 calls_df.get("context", "NpN") == context
                             ]
                             detection_rate = len(
-                                context_calls[context_calls["variant_call"]]
+                                context_calls[context_calls["variant_call"]],
                             ) / max(1, len(context_calls))
                         else:
                             detection_rate = 0.0
@@ -105,7 +112,7 @@ class StratifiedAnalyzer:
                     }
 
                     print(
-                        f"    {context} @ depth={depth}, AF={af:.0e}: {np.mean(detection_rates):.3f} ± {np.std(detection_rates):.3f}"
+                        f"    {context} @ depth={depth}, AF={af:.0e}: {np.mean(detection_rates):.3f} ± {np.std(detection_rates):.3f}",
                     )
 
         self.power_results = {
@@ -154,7 +161,7 @@ class StratifiedAnalyzer:
 
                 for rep in range(n_replicates):
                     run_rng = np.random.default_rng(
-                        self.config.seed + rep * 2000 + int(af * 1e6) + depth
+                        self.config.seed + rep * 2000 + int(af * 1e6) + depth,
                     )
 
                     # Create test config
@@ -170,7 +177,8 @@ class StratifiedAnalyzer:
                     if len(calls_df) > 0:
                         # Use p-value as proxy for predicted probability (inverted)
                         prob_scores = 1 - calls_df.get(
-                            "p_value", self.rng.uniform(0, 1, len(calls_df))
+                            "p_value",
+                            self.rng.uniform(0, 1, len(calls_df)),
                         )
                         true_positives = calls_df.get("variant_call", False)
 
@@ -180,7 +188,9 @@ class StratifiedAnalyzer:
                 if len(predicted_probs) > 0:
                     # Compute calibration metrics
                     calibration_metrics = self._compute_calibration_metrics(
-                        np.array(predicted_probs), np.array(true_labels), n_bins
+                        np.array(predicted_probs),
+                        np.array(true_labels),
+                        n_bins,
                     )
 
                     calibration_data.append(
@@ -193,7 +203,7 @@ class StratifiedAnalyzer:
                             "bin_confidences": calibration_metrics["bin_confidences"],
                             "bin_counts": calibration_metrics["bin_counts"],
                             "n_samples": len(predicted_probs),
-                        }
+                        },
                     )
 
         self.calibration_results = {
@@ -207,7 +217,10 @@ class StratifiedAnalyzer:
         return self.calibration_results
 
     def _simulate_with_context(
-        self, config: PipelineConfig, rng: np.random.Generator, context: str
+        self,
+        config: PipelineConfig,
+        rng: np.random.Generator,
+        context: str,
     ) -> pd.DataFrame:
         """Simulate reads with trinucleotide context tagging."""
         reads_df = simulate_reads(config, rng)
@@ -233,7 +246,10 @@ class StratifiedAnalyzer:
         return reads_df
 
     def _create_context_config(
-        self, af: float, depth: int, context: str
+        self,
+        af: float,
+        depth: int,
+        context: str,
     ) -> PipelineConfig:
         """Create configuration for context-specific analysis."""
         return PipelineConfig(
@@ -267,7 +283,10 @@ class StratifiedAnalyzer:
         )
 
     def _compute_calibration_metrics(
-        self, predicted_probs: np.ndarray, true_labels: np.ndarray, n_bins: int
+        self,
+        predicted_probs: np.ndarray,
+        true_labels: np.ndarray,
+        n_bins: int,
     ) -> dict[str, Any]:
         """Compute calibration metrics including ECE and binned accuracy."""
         # Create bins
@@ -344,7 +363,9 @@ class StratifiedAnalyzer:
 
 
 def run_stratified_analysis(
-    config: PipelineConfig, rng: np.random.Generator, output_dir: str = "reports"
+    config: PipelineConfig,
+    rng: np.random.Generator,
+    output_dir: str = "reports",
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Run complete stratified power and calibration analysis.
 
