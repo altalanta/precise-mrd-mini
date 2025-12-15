@@ -60,27 +60,38 @@ class ContaminationSimulator:
         # Test index-hopping effects
         print("  Testing index-hopping effects...")
         hop_results = self._test_index_hopping(
-            hop_rates, af_test_values, depth_values, n_replicates
+            hop_rates,
+            af_test_values,
+            depth_values,
+            n_replicates,
         )
         results["index_hopping"] = hop_results
 
         # Test barcode collision effects
         print("  Testing barcode collision effects...")
         collision_results = self._test_barcode_collisions(
-            barcode_collision_rates, af_test_values, depth_values, n_replicates
+            barcode_collision_rates,
+            af_test_values,
+            depth_values,
+            n_replicates,
         )
         results["barcode_collisions"] = collision_results
 
         # Test cross-sample contamination
         print("  Testing cross-sample contamination...")
         cross_contam_results = self._test_cross_sample_contamination(
-            cross_sample_proportions, af_test_values, depth_values, n_replicates
+            cross_sample_proportions,
+            af_test_values,
+            depth_values,
+            n_replicates,
         )
         results["cross_sample_contamination"] = cross_contam_results
 
         # Create sensitivity matrix for heatmap
         sensitivity_matrix = self._create_sensitivity_matrix(
-            results, af_test_values, depth_values
+            results,
+            af_test_values,
+            depth_values,
         )
         results["sensitivity_matrix"] = sensitivity_matrix
 
@@ -109,29 +120,37 @@ class ContaminationSimulator:
                     for rep in range(n_replicates):
                         # Create contaminated simulation
                         run_rng = np.random.default_rng(
-                            self.config.seed + rep * 1000 + int(hop_rate * 1e6)
+                            self.config.seed + rep * 1000 + int(hop_rate * 1e6),
                         )
 
                         # Simulate with index hopping
                         contam_config = self._create_contamination_config(af, depth)
                         reads_df = self._simulate_with_index_hopping(
-                            contam_config, run_rng, hop_rate
+                            contam_config,
+                            run_rng,
+                            hop_rate,
                         )
 
                         # Process through pipeline
                         collapsed_df = collapse_umis(reads_df, contam_config, run_rng)
                         error_model = fit_error_model(
-                            collapsed_df, contam_config, run_rng
+                            collapsed_df,
+                            contam_config,
+                            run_rng,
                         )
                         calls_df = call_mrd(
-                            collapsed_df, error_model, contam_config, run_rng
+                            collapsed_df,
+                            error_model,
+                            contam_config,
+                            run_rng,
                         )
 
                         # Calculate sensitivity (detection rate)
                         n_detected = len(calls_df[calls_df["variant_call"]])
                         # Approximate expected detections (crude estimate)
                         expected_detections = max(
-                            1, int(af * depth * (1 - hop_rate) * 0.9)
+                            1,
+                            int(af * depth * (1 - hop_rate) * 0.9),
                         )  # 80% pipeline efficiency
                         sensitivity = (
                             min(1.0, n_detected / expected_detections)
@@ -171,22 +190,29 @@ class ContaminationSimulator:
 
                     for rep in range(n_replicates):
                         run_rng = np.random.default_rng(
-                            self.config.seed + rep * 2000 + int(collision_rate * 1e6)
+                            self.config.seed + rep * 2000 + int(collision_rate * 1e6),
                         )
 
                         # Simulate with barcode collisions
                         contam_config = self._create_contamination_config(af, depth)
                         reads_df = self._simulate_with_barcode_collisions(
-                            contam_config, run_rng, collision_rate
+                            contam_config,
+                            run_rng,
+                            collision_rate,
                         )
 
                         # Process through pipeline
                         collapsed_df = collapse_umis(reads_df, contam_config, run_rng)
                         error_model = fit_error_model(
-                            collapsed_df, contam_config, run_rng
+                            collapsed_df,
+                            contam_config,
+                            run_rng,
                         )
                         calls_df = call_mrd(
-                            collapsed_df, error_model, contam_config, run_rng
+                            collapsed_df,
+                            error_model,
+                            contam_config,
+                            run_rng,
                         )
 
                         # Calculate metrics
@@ -236,22 +262,29 @@ class ContaminationSimulator:
 
                     for rep in range(n_replicates):
                         run_rng = np.random.default_rng(
-                            self.config.seed + rep * 3000 + int(contam_prop * 1e6)
+                            self.config.seed + rep * 3000 + int(contam_prop * 1e6),
                         )
 
                         # Simulate with cross-sample contamination
                         contam_config = self._create_contamination_config(af, depth)
                         reads_df = self._simulate_with_cross_contamination(
-                            contam_config, run_rng, contam_prop
+                            contam_config,
+                            run_rng,
+                            contam_prop,
                         )
 
                         # Process through pipeline
                         collapsed_df = collapse_umis(reads_df, contam_config, run_rng)
                         error_model = fit_error_model(
-                            collapsed_df, contam_config, run_rng
+                            collapsed_df,
+                            contam_config,
+                            run_rng,
                         )
                         calls_df = call_mrd(
-                            collapsed_df, error_model, contam_config, run_rng
+                            collapsed_df,
+                            error_model,
+                            contam_config,
+                            run_rng,
                         )
 
                         # Calculate sensitivity
@@ -273,7 +306,10 @@ class ContaminationSimulator:
         return cross_results
 
     def _simulate_with_index_hopping(
-        self, config: PipelineConfig, rng: np.random.Generator, hop_rate: float
+        self,
+        config: PipelineConfig,
+        rng: np.random.Generator,
+        hop_rate: float,
     ) -> pd.DataFrame:
         """Simulate reads with index-hopping contamination."""
         # Start with normal simulation
@@ -301,7 +337,10 @@ class ContaminationSimulator:
         return reads_df
 
     def _simulate_with_barcode_collisions(
-        self, config: PipelineConfig, rng: np.random.Generator, collision_rate: float
+        self,
+        config: PipelineConfig,
+        rng: np.random.Generator,
+        collision_rate: float,
     ) -> pd.DataFrame:
         """Simulate reads with barcode collision artifacts."""
         reads_df = simulate_reads(config, rng)
@@ -314,7 +353,9 @@ class ContaminationSimulator:
             if n_collisions > 0:
                 # Select families for collision
                 collision_indices = rng.choice(
-                    n_families, size=n_collisions, replace=False
+                    n_families,
+                    size=n_collisions,
+                    replace=False,
                 )
 
                 # Increase false positive rate for collided families
@@ -327,7 +368,10 @@ class ContaminationSimulator:
         return reads_df
 
     def _simulate_with_cross_contamination(
-        self, config: PipelineConfig, rng: np.random.Generator, contam_proportion: float
+        self,
+        config: PipelineConfig,
+        rng: np.random.Generator,
+        contam_proportion: float,
     ) -> pd.DataFrame:
         """Simulate reads with cross-sample contamination."""
         reads_df = simulate_reads(config, rng)
@@ -340,18 +384,21 @@ class ContaminationSimulator:
             if n_contam > 0:
                 # Create contaminating sample (higher AF)
                 contam_af = min(
-                    0.1, reads_df["allele_fraction"].iloc[0] * 10
+                    0.1,
+                    reads_df["allele_fraction"].iloc[0] * 10,
                 )  # 10x higher AF
 
                 contam_config = self._create_contamination_config(
-                    contam_af, reads_df["target_depth"].iloc[0]
+                    contam_af,
+                    reads_df["target_depth"].iloc[0],
                 )
                 contam_reads = simulate_reads(contam_config, rng)
 
                 # Take subset for contamination
                 if len(contam_reads) > 0:
                     contam_subset = contam_reads.sample(
-                        n=min(n_contam, len(contam_reads)), random_state=rng
+                        n=min(n_contam, len(contam_reads)),
+                        random_state=rng,
                     ).copy()
                     contam_subset["sample_id"] = "contam_" + contam_subset[
                         "sample_id"
@@ -379,7 +426,10 @@ class ContaminationSimulator:
         )
 
     def _create_sensitivity_matrix(
-        self, results: dict[str, Any], af_values: list[float], depth_values: list[int]
+        self,
+        results: dict[str, Any],
+        af_values: list[float],
+        depth_values: list[int],
     ) -> dict[str, Any]:
         """Create sensitivity matrix for heatmap visualization."""
         # Extract sensitivity data for different contamination types
@@ -391,7 +441,7 @@ class ContaminationSimulator:
             hop_rates = list(hop_data.keys())
 
             sensitivity_matrix = np.zeros(
-                (len(hop_rates), len(af_values) * len(depth_values))
+                (len(hop_rates), len(af_values) * len(depth_values)),
             )
 
             for i, hop_rate in enumerate(hop_rates):
@@ -469,7 +519,7 @@ class ContaminationSimulator:
             )
 
             plt.title(
-                "Contamination Impact on Variant Detection\n(Index Hopping Effects)"
+                "Contamination Impact on Variant Detection\n(Index Hopping Effects)",
             )
             plt.xlabel("Test Conditions (AF, Depth)")
             plt.ylabel("Index Hopping Rate")
@@ -483,7 +533,9 @@ class ContaminationSimulator:
 
 
 def run_contamination_stress_test(
-    config: PipelineConfig, rng: np.random.Generator, output_dir: str = "reports"
+    config: PipelineConfig,
+    rng: np.random.Generator,
+    output_dir: str = "reports",
 ) -> dict[str, Any]:
     """Run complete contamination stress testing suite.
 
