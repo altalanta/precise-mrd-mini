@@ -30,7 +30,9 @@ class MLVariantCaller(VariantCaller):
         self.training_results: dict[str, Any] = {}
 
     def train(
-        self, collapsed_df: pd.DataFrame, rng: np.random.Generator
+        self,
+        collapsed_df: pd.DataFrame,
+        rng: np.random.Generator,
     ) -> dict[str, Any]:
         """Train the ML model and register it with MLflow."""
         setup_mlflow()
@@ -49,7 +51,8 @@ class MLVariantCaller(VariantCaller):
             # Log metrics
             metrics_to_log = {
                 "optimal_threshold": self.training_results.get(
-                    "optimal_threshold", 0.0
+                    "optimal_threshold",
+                    0.0,
                 ),
                 "roc_auc": self.training_results.get("roc_auc", 0.0),
             }
@@ -70,12 +73,15 @@ class MLVariantCaller(VariantCaller):
             return self.training_results
 
     def predict(
-        self, collapsed_df: pd.DataFrame, error_model_df: pd.DataFrame = None
+        self,
+        collapsed_df: pd.DataFrame,
+        error_model_df: pd.DataFrame = None,
     ) -> pd.DataFrame:
         """Predict variants using the trained ML model."""
         ml_probabilities = self.model.predict_variants(collapsed_df)
         optimal_threshold = self.training_results.get(
-            "optimal_threshold", np.median(ml_probabilities)
+            "optimal_threshold",
+            np.median(ml_probabilities),
         )
         ml_calls = (ml_probabilities > optimal_threshold).astype(int)
 
@@ -94,6 +100,6 @@ class MLVariantCaller(VariantCaller):
                 "ml_threshold": optimal_threshold,
                 "calling_method": f"ml_{self.ml_model_type}",
                 "config_hash": self.config.config_hash(),
-            }
+            },
         )
         return results_df

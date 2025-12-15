@@ -18,7 +18,9 @@ class StatisticalVariantCaller(VariantCaller):
     """Variant caller using statistical tests (Poisson, Binomial)."""
 
     def predict(
-        self, collapsed_df: pd.DataFrame, error_model_df: pd.DataFrame
+        self,
+        collapsed_df: pd.DataFrame,
+        error_model_df: pd.DataFrame,
     ) -> pd.DataFrame:
         """Perform MRD calling with statistical testing."""
         stats_config = self.config.stats
@@ -67,7 +69,7 @@ class StatisticalVariantCaller(VariantCaller):
                     "mean_consensus": sample_data["consensus_agreement"].mean(),
                     "test_type": test_type,
                     "config_hash": self.config.config_hash(),
-                }
+                },
             )
 
         if not call_data:
@@ -75,7 +77,8 @@ class StatisticalVariantCaller(VariantCaller):
 
         df = pd.DataFrame(call_data)
         rejected, adjusted_p = self._benjamini_hochberg_correction(
-            df["p_value"].values, alpha
+            df["p_value"].values,
+            alpha,
         )
         df["p_adjusted"] = adjusted_p
         df["significant"] = rejected
@@ -103,7 +106,9 @@ class StatisticalVariantCaller(VariantCaller):
         return stats.binomtest(successes, trials, p, alternative="two-sided").pvalue
 
     def _benjamini_hochberg_correction(
-        self, p_values: np.ndarray, alpha: float
+        self,
+        p_values: np.ndarray,
+        alpha: float,
     ) -> tuple[np.ndarray, np.ndarray]:
         """Benjamini-Hochberg FDR correction."""
         p_values = np.asarray(p_values, dtype=float)

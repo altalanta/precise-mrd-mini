@@ -24,6 +24,3 @@ __all__ = [
     "MLVariantCaller",
     "DLVariantCaller",
 ]
-
-
-

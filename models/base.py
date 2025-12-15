@@ -20,7 +20,9 @@ class VariantCaller(ABC):
         self.model = None
 
     def train(
-        self, collapsed_df: pd.DataFrame, rng: np.random.Generator
+        self,
+        collapsed_df: pd.DataFrame,
+        rng: np.random.Generator,
     ) -> dict[str, Any]:
         """
         Train the variant calling model.
@@ -35,7 +37,9 @@ class VariantCaller(ABC):
 
     @abstractmethod
     def predict(
-        self, collapsed_df: pd.DataFrame, error_model_df: pd.DataFrame
+        self,
+        collapsed_df: pd.DataFrame,
+        error_model_df: pd.DataFrame,
     ) -> pd.DataFrame:
         """
         Predict variants for the given data.
