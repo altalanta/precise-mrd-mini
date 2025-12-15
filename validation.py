@@ -35,7 +35,8 @@ PANDERA_SCHEMAS: Mapping[str, pa.DataFrameSchema] = {
             "lod_ci_lower": pa.Column(float, checks=pa.Check.gt(0)),
             "lod_ci_upper": pa.Column(float, checks=pa.Check.gt(0)),
             "target_detection_rate": pa.Column(
-                float, checks=pa.Check.in_range(min_value=0, max_value=1)
+                float,
+                checks=pa.Check.in_range(min_value=0, max_value=1),
             ),
             "n_replicates": pa.Column(pa.Int64, checks=pa.Check.ge(1)),
         },
@@ -70,7 +71,7 @@ PANDERA_SCHEMAS: Mapping[str, pa.DataFrameSchema] = {
 
 def _load_json_schema(name: str) -> dict[str, Any]:
     with resources.as_file(
-        resources.files("precise_mrd.assets.schemas") / name
+        resources.files("precise_mrd.assets.schemas") / name,
     ) as schema_path:
         with open(schema_path, encoding="utf-8") as fh:
             return json.load(fh)
@@ -156,5 +157,5 @@ def assert_hashes_stable(previous_manifest: Path, current_manifest: Path) -> Non
             "changed": changed,
         }
         raise AssertionError(
-            f"Hash manifest mismatch detected: {json.dumps(details, indent=2)}"
+            f"Hash manifest mismatch detected: {json.dumps(details, indent=2)}",
         )

@@ -114,7 +114,9 @@ class FASTQReader:
                 read_count += 1
 
     def read_fastq_chunks(
-        self, chunk_size: int = 10000, max_reads: int | None = None
+        self,
+        chunk_size: int = 10000,
+        max_reads: int | None = None,
     ) -> Iterator[list[dict[str, Any]]]:
         """Read FASTQ file in chunks for memory-efficient processing.
 
@@ -244,11 +246,20 @@ def process_fastq_to_dataframe(
 
     if use_chunked_processing:
         return _process_fastq_chunked(
-            fastq_path, config, rng, output_path, max_reads, chunk_size
+            fastq_path,
+            config,
+            rng,
+            output_path,
+            max_reads,
+            chunk_size,
         )
     else:
         return _process_fastq_sequential(
-            fastq_path, config, rng, output_path, max_reads
+            fastq_path,
+            config,
+            rng,
+            output_path,
+            max_reads,
         )
 
 
@@ -272,7 +283,7 @@ def _process_fastq_sequential(
     print(
         f"Validation: {validation['total_reads']} reads, "
         f"{validation['umi_reads']} with UMIs, "
-        f"mean length {validation['mean_read_length']:.1f}bp"
+        f"mean length {validation['mean_read_length']:.1f}bp",
     )
 
     # Process reads and group by UMI
@@ -317,7 +328,7 @@ def _process_fastq_sequential(
                 "passes_quality": np.mean(quality_scores) >= 20,  # Quality threshold
                 "passes_consensus": True,  # Simplified for now
                 "config_hash": config.config_hash(),
-            }
+            },
         )
 
     df = pd.DataFrame(processed_data)
@@ -349,7 +360,7 @@ def _process_fastq_chunked(
     print(
         f"Validation: {validation['total_reads']} reads, "
         f"{validation['umi_reads']} with UMIs, "
-        f"mean length {validation['mean_read_length']:.1f}bp"
+        f"mean length {validation['mean_read_length']:.1f}bp",
     )
 
     # Process reads in chunks
@@ -397,7 +408,7 @@ def _process_fastq_chunked(
                     "passes_quality": np.mean(quality_scores) >= 20,
                     "passes_consensus": True,
                     "config_hash": config.config_hash(),
-                }
+                },
             )
 
         all_processed_data.extend(chunk_processed_data)
