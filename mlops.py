@@ -31,7 +31,7 @@ def setup_mlflow():
 
     mlflow.set_experiment(experiment_name)
     log.info(
-        f"MLflow tracking enabled. URI: '{mlflow.get_tracking_uri()}', Experiment: '{experiment_name}'"
+        f"MLflow tracking enabled. URI: '{mlflow.get_tracking_uri()}', Experiment: '{experiment_name}'",
     )
 
 
@@ -79,7 +79,7 @@ def log_pipeline_run(
                             mlflow.log_metric(f"af_{af}_{key}", value)
         else:
             log.warning(
-                f"Metrics file not found at {metrics_path}, skipping metric logging."
+                f"Metrics file not found at {metrics_path}, skipping metric logging.",
             )
 
         # Log all artifacts from the output directory
@@ -88,7 +88,7 @@ def log_pipeline_run(
             log.info(f"Logged artifacts from directory: {artifacts_dir}")
         else:
             log.warning(
-                f"Artifacts directory not found at {artifacts_dir}, skipping artifact logging."
+                f"Artifacts directory not found at {artifacts_dir}, skipping artifact logging.",
             )
 
         log.info(f"Completed MLflow run: {run.info.run_name}")

@@ -112,7 +112,7 @@ def validate_repository_state() -> list[str]:
             ]
             if source_changes:
                 errors.append(
-                    f"Repository has uncommitted source changes: {source_changes}"
+                    f"Repository has uncommitted source changes: {source_changes}",
                 )
     except Exception as e:
         errors.append(f"Could not check git status: {e}")

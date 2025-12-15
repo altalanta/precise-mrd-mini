@@ -20,16 +20,19 @@ class PipelineConfigRequest(BaseModel):
     run_id: str = Field(..., description="Unique run identifier")
     seed: int = Field(7, description="Random seed for reproducibility")
     config_override: str | None = Field(
-        None, description="Custom configuration as YAML string"
+        None,
+        description="Custom configuration as YAML string",
     )
     use_parallel: bool = Field(False, description="Enable parallel processing")
     use_ml_calling: bool = Field(False, description="Enable ML-based variant calling")
     use_deep_learning: bool = Field(
-        False, description="Enable deep learning variant calling"
+        False,
+        description="Enable deep learning variant calling",
     )
     ml_model_type: MLModelType = Field("ensemble", description="ML model type")
     dl_model_type: DLModelType = Field(
-        "cnn_lstm", description="Deep learning model type"
+        "cnn_lstm",
+        description="Deep learning model type",
     )
 
 
@@ -94,16 +97,20 @@ class ServiceStatus(BaseModel):
     """Health status of a single downstream service."""
 
     name: str = Field(
-        ..., description="Name of the service (e.g., 'database', 'redis')."
+        ...,
+        description="Name of the service (e.g., 'database', 'redis').",
     )
     status: HealthStatusEnum | str = Field(
-        ..., description="Service status ('ok', 'error', or 'degraded')."
+        ...,
+        description="Service status ('ok', 'error', or 'degraded').",
     )
     message: str | None = Field(
-        None, description="Additional details about the service status."
+        None,
+        description="Additional details about the service status.",
     )
     response_time_ms: float | None = Field(
-        None, description="Response time of the health check in milliseconds."
+        None,
+        description="Response time of the health check in milliseconds.",
     )
 
 
@@ -111,9 +118,11 @@ class HealthStatus(BaseModel):
     """Overall health status of the API."""
 
     status: HealthStatusEnum | str = Field(
-        ..., description="Overall status ('ok', 'error', or 'degraded')."
+        ...,
+        description="Overall status ('ok', 'error', or 'degraded').",
     )
     version: str = Field(..., description="API version.")
     services: list[ServiceStatus] = Field(
-        ..., description="Status of individual downstream services."
+        ...,
+        description="Status of individual downstream services.",
     )

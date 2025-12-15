@@ -57,7 +57,7 @@ class PipelineCache:
     def _get_cache_key(self, func_name: str, args_hash: str, config_hash: str) -> str:
         """Generate cache key for a function call."""
         return hashlib.sha256(
-            f"{func_name}:{args_hash}:{config_hash}".encode()
+            f"{func_name}:{args_hash}:{config_hash}".encode(),
         ).hexdigest()[:16]
 
     def _get_config_hash(self, config: PipelineConfig) -> str:
