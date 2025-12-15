@@ -8,34 +8,46 @@ class SimulatedReadsSchema(pa.DataFrameModel):
     """Schema for the output of the simulate_reads function."""
 
     sample_id: Series[int] = pa.Field(
-        ge=0, description="Unique identifier for each simulated sample."
+        ge=0,
+        description="Unique identifier for each simulated sample.",
     )
     allele_fraction: Series[float] = pa.Field(
-        ge=0, le=1, description="Target allele fraction for the simulation."
+        ge=0,
+        le=1,
+        description="Target allele fraction for the simulation.",
     )
     target_depth: Series[int] = pa.Field(
-        ge=0, description="Target UMI depth for the simulation."
+        ge=0,
+        description="Target UMI depth for the simulation.",
     )
     replicate: Series[int] = pa.Field(
-        ge=0, description="Replicate number for a given condition."
+        ge=0,
+        description="Replicate number for a given condition.",
     )
     n_families: Series[int] = pa.Field(
-        ge=0, description="Number of UMI families simulated."
+        ge=0,
+        description="Number of UMI families simulated.",
     )
     n_true_variants: Series[int] = pa.Field(
-        ge=0, description="Number of true variant families simulated."
+        ge=0,
+        description="Number of true variant families simulated.",
     )
     n_false_positives: Series[int] = pa.Field(
-        ge=0, description="Number of false positive families simulated."
+        ge=0,
+        description="Number of false positive families simulated.",
     )
     background_rate: Series[float] = pa.Field(
-        ge=0, le=1, description="Background error rate used."
+        ge=0,
+        le=1,
+        description="Background error rate used.",
     )
     mean_family_size: Series[float] = pa.Field(
-        ge=0, description="Mean family size for the sample."
+        ge=0,
+        description="Mean family size for the sample.",
     )
     mean_quality: Series[float] = pa.Field(
-        ge=0, description="Mean quality score for the sample."
+        ge=0,
+        description="Mean quality score for the sample.",
     )
     config_hash: Series[str] = pa.Field(description="Hash of the configuration used.")
 

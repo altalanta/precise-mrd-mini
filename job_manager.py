@@ -47,7 +47,11 @@ class JobManager:
         return self.db.query(Job).filter(Job.id == job_id).first()
 
     def update_job_status(
-        self, job_id: str, status: str, progress: float = None, error: str = None
+        self,
+        job_id: str,
+        status: str,
+        progress: float = None,
+        error: str = None,
     ):
         """Update job status and progress, and broadcast the update."""
         job = self.get_job(job_id)
@@ -137,7 +141,11 @@ class AsyncJobManager:
         return result.scalar_one_or_none()
 
     async def update_job_status(
-        self, job_id: str, status: str, progress: float = None, error: str = None
+        self,
+        job_id: str,
+        status: str,
+        progress: float = None,
+        error: str = None,
     ):
         """Update job status and progress, and broadcast the update."""
         job = await self.get_job(job_id)
@@ -185,7 +193,7 @@ class AsyncJobManager:
     async def get_all_jobs(self, skip: int = 0, limit: int = 100) -> list[Job]:
         """Get all jobs."""
         result = await self.db.execute(
-            select(Job).order_by(Job.created_at.desc()).offset(skip).limit(limit)
+            select(Job).order_by(Job.created_at.desc()).offset(skip).limit(limit),
         )
         return list(result.scalars().all())
 
