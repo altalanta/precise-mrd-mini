@@ -26,7 +26,7 @@ def lambda_handler(event, context):
         run_id = body.get("run_id", f"api-run-{context.aws_request_id}")
         seed = body.get("seed", 7)
         config_override = body.get(
-            "config_override"
+            "config_override",
         )  # This would be the full YAML content as a string
 
         # Construct the command for the Batch job
@@ -58,7 +58,7 @@ def lambda_handler(event, context):
                     "message": "Pipeline job submitted successfully.",
                     "jobId": job_id,
                     "run_id": run_id,
-                }
+                },
             ),
         }
 
