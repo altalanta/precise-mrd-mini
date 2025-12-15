@@ -43,7 +43,9 @@ class PipelineService:
         """
         # Bind job and run IDs to the logger for contextual logging
         job_log = log.bind(
-            job_id=job_id, run_id=config_request.run_id, seed=config_request.seed
+            job_id=job_id,
+            run_id=config_request.run_id,
+            seed=config_request.seed,
         )
 
         try:
@@ -58,7 +60,8 @@ class PipelineService:
             config_path = f"configs/generated_config_{job_id}.yaml"
             config = create_config_from_request(config_request, config_path)
             job_log.info(
-                "Configuration created and validated.", config_path=config.config_file
+                "Configuration created and validated.",
+                config_path=config.config_file,
             )
 
             # Define output directories based on the run_id from the config
@@ -78,7 +81,7 @@ class PipelineService:
 
             job_manager.update_job_status(job_id, "running", progress=0.50)
             job_log.info(
-                "Finished stage: simulate_reads. Starting stage: collapse_umis"
+                "Finished stage: simulate_reads. Starting stage: collapse_umis",
             )
             collapsed_path = data_dir / "collapsed_umis.parquet"
             collapsed_df = collapse_umis(
@@ -91,11 +94,14 @@ class PipelineService:
 
             job_manager.update_job_status(job_id, "running", progress=0.70)
             job_log.info(
-                "Finished stage: collapse_umis. Starting stage: fit_error_model"
+                "Finished stage: collapse_umis. Starting stage: fit_error_model",
             )
             error_model_path = data_dir / "error_model.parquet"
             error_model_df = fit_error_model(
-                collapsed_df, config, rng, output_path=str(error_model_path)
+                collapsed_df,
+                config,
+                rng,
+                output_path=str(error_model_path),
             )
 
             job_manager.update_job_status(job_id, "running", progress=0.80)
@@ -140,7 +146,11 @@ class PipelineService:
             PipelineIO.save_json(metrics, str(metrics_path))
             PipelineIO.save_json(run_context, str(context_path))
             render_report(
-                calls_df, metrics, config.to_dict(), run_context, str(report_path)
+                calls_df,
+                metrics,
+                config.to_dict(),
+                run_context,
+                str(report_path),
             )
 
             manifest_path = reports_dir / "hash_manifest.json"

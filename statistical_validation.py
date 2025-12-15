@@ -53,7 +53,9 @@ class CrossValidator:
         # Choose cross-validation strategy
         if stratified and len(np.unique(y)) > 1:
             cv = StratifiedKFold(
-                n_splits=k_folds, shuffle=True, random_state=self.config.seed
+                n_splits=k_folds,
+                shuffle=True,
+                random_state=self.config.seed,
             )
         else:
             cv = KFold(n_splits=k_folds, shuffle=True, random_state=self.config.seed)
@@ -85,7 +87,7 @@ class CrossValidator:
                     "train_size": len(X_train),
                     "test_size": len(X_test),
                     "metrics": fold_metrics,
-                }
+                },
             )
 
         # Calculate comprehensive statistics
@@ -108,7 +110,10 @@ class CrossValidator:
         return results
 
     def _calculate_fold_metrics(
-        self, y_true: np.ndarray, y_pred_proba: np.ndarray, scoring: str
+        self,
+        y_true: np.ndarray,
+        y_pred_proba: np.ndarray,
+        scoring: str,
     ) -> dict[str, float]:
         """Calculate metrics for a single fold."""
         if scoring == "roc_auc":
@@ -128,7 +133,9 @@ class CrossValidator:
         }
 
     def _bootstrap_ci(
-        self, scores: np.ndarray, confidence: float = 0.95
+        self,
+        scores: np.ndarray,
+        confidence: float = 0.95,
     ) -> tuple[float, float]:
         """Calculate bootstrap confidence interval for CV scores."""
         n_bootstrap = 1000
@@ -154,7 +161,9 @@ class UncertaintyQuantifier:
         self.config = config
 
     def bayesian_uncertainty(
-        self, posterior_samples: list[np.ndarray], credible_interval: float = 0.95
+        self,
+        posterior_samples: list[np.ndarray],
+        credible_interval: float = 0.95,
     ) -> dict[str, Any]:
         """Quantify uncertainty using Bayesian credible intervals.
 
@@ -197,7 +206,9 @@ class UncertaintyQuantifier:
         }
 
     def _hpdi(
-        self, samples: np.ndarray, credible_interval: float
+        self,
+        samples: np.ndarray,
+        credible_interval: float,
     ) -> tuple[np.ndarray, np.ndarray]:
         """Calculate highest posterior density interval."""
         # Simplified HPDI calculation
@@ -296,7 +307,9 @@ class StatisticalTester:
         self.alpha = config.stats.alpha
 
     def multiple_testing_correction(
-        self, p_values: np.ndarray, method: str = "benjamini_hochberg"
+        self,
+        p_values: np.ndarray,
+        method: str = "benjamini_hochberg",
     ) -> dict[str, Any]:
         """Apply multiple testing correction to p-values.
 
@@ -478,7 +491,9 @@ class RobustnessAnalyzer:
             for magnitude in perturbation_magnitudes:
                 # Apply perturbation
                 perturbed_df = self._apply_perturbation(
-                    collapsed_df.copy(), pert_type, magnitude
+                    collapsed_df.copy(),
+                    pert_type,
+                    magnitude,
                 )
 
                 # Calculate metrics on perturbed data
@@ -501,7 +516,10 @@ class RobustnessAnalyzer:
         }
 
     def _apply_perturbation(
-        self, df: pd.DataFrame, pert_type: str, magnitude: float
+        self,
+        df: pd.DataFrame,
+        pert_type: str,
+        magnitude: float,
     ) -> pd.DataFrame:
         """Apply perturbation to specified parameter."""
         if pert_type == "family_size":
@@ -549,7 +567,9 @@ class RobustnessAnalyzer:
         for _ in range(n_bootstrap):
             # Bootstrap sample
             indices = rng.choice(
-                len(collapsed_df), size=len(collapsed_df), replace=True
+                len(collapsed_df),
+                size=len(collapsed_df),
+                replace=True,
             )
             bootstrap_sample = collapsed_df.iloc[indices]
 
@@ -614,7 +634,11 @@ class ModelValidator:
             # Perform cross-validation
             cv = CrossValidator(self.config)
             results = cv.k_fold_cross_validation(
-                X, y, model_func, k_folds=5, scoring=scoring
+                X,
+                y,
+                model_func,
+                k_folds=5,
+                scoring=scoring,
             )
 
             cv_results[model_name] = results
@@ -655,7 +679,10 @@ class ModelValidator:
         }
 
     def calibration_analysis(
-        self, y_true: np.ndarray, y_pred_proba: np.ndarray, n_bins: int = 10
+        self,
+        y_true: np.ndarray,
+        y_pred_proba: np.ndarray,
+        n_bins: int = 10,
     ) -> dict[str, Any]:
         """Analyze prediction calibration across probability bins.
 
@@ -691,7 +718,7 @@ class ModelValidator:
                         "event_rate": 0.0,
                         "confidence": 0.0,
                         "ece_contribution": 0.0,
-                    }
+                    },
                 )
                 continue
 
@@ -711,7 +738,7 @@ class ModelValidator:
                     "event_rate": float(bin_event_rate),
                     "confidence": float(bin_confidence),
                     "ece_contribution": float(ece_contribution),
-                }
+                },
             )
 
         # Calculate overall calibration metrics

@@ -17,16 +17,16 @@ class SimulatedReadsSchema(pa.DataFrameModel):
     """
 
     umi: Series[str] = pa.Field(
-        description="Unique Molecular Identifier for a read group."
+        description="Unique Molecular Identifier for a read group.",
     )
     allele: Series[str] = pa.Field(
-        description="The genetic allele ('A', 'B', 'C', etc.)."
+        description="The genetic allele ('A', 'B', 'C', etc.).",
     )
     is_variant: Series[bool] = pa.Field(
-        description="True if the read represents the variant allele."
+        description="True if the read represents the variant allele.",
     )
     has_error: Series[bool] = pa.Field(
-        description="True if a sequencing error was introduced."
+        description="True if a sequencing error was introduced.",
     )
 
     class Config:
@@ -40,19 +40,23 @@ class CollapsedUMIsSchema(pa.DataFrameModel):
     """
 
     umi_sequence: Series[str] = pa.Field(
-        description="The consensus sequence of the UMI."
+        description="The consensus sequence of the UMI.",
     )
     total_reads: Series[int] = pa.Field(
-        ge=1, description="Total number of raw reads for this UMI."
+        ge=1,
+        description="Total number of raw reads for this UMI.",
     )
     variant_reads: Series[int] = pa.Field(
-        ge=0, description="Number of reads supporting the variant allele."
+        ge=0,
+        description="Number of reads supporting the variant allele.",
     )
     umi_fraction: Series[float] = pa.Field(
-        ge=0.0, le=1.0, description="Fraction of variant reads in the UMI group."
+        ge=0.0,
+        le=1.0,
+        description="Fraction of variant reads in the UMI group.",
     )
     is_true_variant: Series[bool] = pa.Field(
-        description="Ground truth: True if the UMI corresponds to a true variant."
+        description="Ground truth: True if the UMI corresponds to a true variant.",
     )
 
     class Config:
@@ -66,10 +70,14 @@ class ErrorModelSchema(pa.DataFrameModel):
     """
 
     umi_fraction: Series[float] = pa.Field(
-        ge=0.0, le=1.0, description="Binned UMI fraction."
+        ge=0.0,
+        le=1.0,
+        description="Binned UMI fraction.",
     )
     error_rate: Series[float] = pa.Field(
-        ge=0.0, le=1.0, description="Calculated error rate for the bin."
+        ge=0.0,
+        le=1.0,
+        description="Calculated error rate for the bin.",
     )
 
     class Config:
@@ -84,7 +92,7 @@ class MRDCallsSchema(CollapsedUMIsSchema):
     """
 
     predicted_is_variant: Series[bool] = pa.Field(
-        description="The model's prediction of whether the UMI is a variant."
+        description="The model's prediction of whether the UMI is a variant.",
     )
     prediction_prob: Series[float] = pa.Field(
         ge=0.0,

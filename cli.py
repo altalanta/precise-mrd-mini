@@ -61,7 +61,7 @@ def _load_pipeline_config(config_option: Path | None, seed: int) -> PipelineConf
             config_path = Path(config_option)
             if not config_path.exists():
                 raise click.ClickException(
-                    f"Configuration file not found: {config_path}"
+                    f"Configuration file not found: {config_path}",
                 )
         else:
             resource = (
@@ -74,7 +74,7 @@ def _load_pipeline_config(config_option: Path | None, seed: int) -> PipelineConf
         except Exception as exc:  # pragma: no cover - defensive fallback
             if config_option:
                 raise click.ClickException(
-                    f"Failed to load configuration {config_path}: {exc}"
+                    f"Failed to load configuration {config_path}: {exc}",
                 ) from exc
             config = create_minimal_config(seed)
 
@@ -148,7 +148,7 @@ def _run_smoke_pipeline(
 
         if cached_characteristics:
             click.echo(
-                "🔧 Auto-tuning configuration based on cached data characteristics..."
+                "🔧 Auto-tuning configuration based on cached data characteristics...",
             )
             config = config.adapt_to_data(cached_characteristics)
         else:
@@ -177,7 +177,7 @@ def _run_smoke_pipeline(
             "Warning: _run_smoke_pipeline's direct calling is deprecated. "
             "Use 'eval train' and 'eval predict' commands for ML models.",
             fg="yellow",
-        )
+        ),
     )
     from .models.statistical import StatisticalVariantCaller
 
@@ -390,7 +390,7 @@ def smoke_cmd(
                 "artifacts": {key: str(path) for key, path in artifacts.items()},
             },
             indent=2,
-        )
+        ),
     )
     log.info("Smoke pipeline run completed successfully.")
 
@@ -462,7 +462,7 @@ def determinism_cmd(ctx: CLIContext, out_dir: Path) -> None:
                 "status": "hashes-identical",
             },
             indent=2,
-        )
+        ),
     )
     log.info("Determinism check completed successfully: hashes are identical.")
 
@@ -486,7 +486,11 @@ main.add_command(eval_group)
 
 @eval_group.command("lob")
 @click.option(
-    "--n-blank", default=50, show_default=True, type=int, help="Blank replicates."
+    "--n-blank",
+    default=50,
+    show_default=True,
+    type=int,
+    help="Blank replicates.",
 )
 @click.pass_obj
 def eval_lob_cmd(ctx: CLIContext, n_blank: int) -> None:
@@ -503,7 +507,7 @@ def eval_lob_cmd(ctx: CLIContext, n_blank: int) -> None:
                 "blank_runs": n_blank,
             },
             indent=2,
-        )
+        ),
     )
 
 
@@ -530,7 +534,7 @@ def eval_lod_cmd(ctx: CLIContext, replicates: int) -> None:
                 "lod_table": str(REPORTS_DIR / "lod_table.csv"),
             },
             indent=2,
-        )
+        ),
     )
 
 
@@ -557,7 +561,10 @@ def eval_lod_cmd(ctx: CLIContext, replicates: int) -> None:
 )
 @click.pass_obj
 def eval_train_cmd(
-    ctx: CLIContext, data_in: Path, model_type: str, model_subtype: str
+    ctx: CLIContext,
+    data_in: Path,
+    model_type: str,
+    model_subtype: str,
 ) -> None:
     """Train a model and register it with MLflow."""
     log = get_logger(__name__)
@@ -655,7 +662,7 @@ def eval_loq_cmd(ctx: CLIContext, replicates: int) -> None:
                 "loq_table": str(REPORTS_DIR / "loq_table.csv"),
             },
             indent=2,
-        )
+        ),
     )
 
 
@@ -677,7 +684,7 @@ def eval_contamination_cmd(ctx: CLIContext) -> None:
                 "contexts": list(results.keys()),
             },
             indent=2,
-        )
+        ),
     )
 
 
@@ -689,7 +696,9 @@ def eval_stratified_cmd(ctx: CLIContext) -> None:
     rng = set_global_seed(ctx.seed, deterministic_ops=True)
     _ensure_reports_dir()
     power_results, calibration_results = run_stratified_analysis(
-        config, rng, output_dir=str(REPORTS_DIR)
+        config,
+        rng,
+        output_dir=str(REPORTS_DIR),
     )
     validate_artifacts(REPORTS_DIR)
     click.echo(
@@ -702,7 +711,7 @@ def eval_stratified_cmd(ctx: CLIContext) -> None:
                 "depths": power_results.get("depth_values", []),
             },
             indent=2,
-        )
+        ),
     )
 
 
@@ -809,7 +818,9 @@ def ml_performance_cmd(reset: bool) -> None:
         ensemble_importance = ml_report["feature_importance"].get("ensemble_model", {})
         if ensemble_importance:
             sorted_features = sorted(
-                ensemble_importance.items(), key=lambda x: x[1], reverse=True
+                ensemble_importance.items(),
+                key=lambda x: x[1],
+                reverse=True,
             )
             for i, (feat, imp) in enumerate(sorted_features[:5]):
                 click.echo(f"  {i + 1}. {feat}: {imp:.3f}")
@@ -823,7 +834,7 @@ def ml_performance_cmd(reset: bool) -> None:
     # Model comparison
     if comparison.get("best_model"):
         click.echo(
-            f"🏆 Best Model: {comparison['best_model']} (AUC: {comparison['best_metric']:.3f})"
+            f"🏆 Best Model: {comparison['best_model']} (AUC: {comparison['best_metric']:.3f})",
         )
 
         click.echo("Model Ranking:")
@@ -848,14 +859,16 @@ def ml_performance_cmd(reset: bool) -> None:
     help="Port to bind the dashboard to.",
 )
 @click.option(
-    "--debug", is_flag=True, help="Enable debug mode for dashboard development."
+    "--debug",
+    is_flag=True,
+    help="Enable debug mode for dashboard development.",
 )
 def dashboard_cmd(host: str, port: int, debug: bool) -> None:
     """Launch the interactive web dashboard for the MRD pipeline."""
     click.echo("🌐 Starting Precise MRD Pipeline Dashboard...")
     click.echo(f"📊 Dashboard will be available at: http://{host}:{port}")
     click.echo(
-        "🎛️  Features include job monitoring, configuration management, and result visualization"
+        "🎛️  Features include job monitoring, configuration management, and result visualization",
     )
 
     try:
@@ -891,11 +904,17 @@ def dashboard_cmd(host: str, port: int, debug: bool) -> None:
 )
 @click.option("--k-folds", default=5, type=int, help="Number of cross-validation folds")
 @click.option(
-    "--scoring", default="roc_auc", type=str, help="Scoring metric for validation"
+    "--scoring",
+    default="roc_auc",
+    type=str,
+    help="Scoring metric for validation",
 )
 @click.pass_obj
 def validate_model_cmd(
-    ctx: CLIContext, data_path: Path | None, k_folds: int, scoring: str
+    ctx: CLIContext,
+    data_path: Path | None,
+    k_folds: int,
+    scoring: str,
 ) -> None:
     """Run comprehensive model validation and statistical testing."""
     config = _load_pipeline_config(ctx.config_override, ctx.seed)
@@ -929,17 +948,21 @@ def validate_model_cmd(
             return model
 
         cv_results = cv.k_fold_cross_validation(
-            X, y, simple_model_func, k_folds=k_folds, scoring=scoring
+            X,
+            y,
+            simple_model_func,
+            k_folds=k_folds,
+            scoring=scoring,
         )
         click.echo(
-            f"  Cross-validation {scoring}: {cv_results['mean_score']:.3f} ± {cv_results['std_score']:.3f}"
+            f"  Cross-validation {scoring}: {cv_results['mean_score']:.3f} ± {cv_results['std_score']:.3f}",
         )
 
     # Robustness analysis
     robustness = RobustnessAnalyzer(config)
     robustness_results = robustness.bootstrap_robustness(calls_df, n_bootstrap=100)
     click.echo(
-        f"  Robustness analysis: {len(robustness_results['robustness_statistics'])} metrics evaluated"
+        f"  Robustness analysis: {len(robustness_results['robustness_statistics'])} metrics evaluated",
     )
 
     # Statistical testing
@@ -948,10 +971,11 @@ def validate_model_cmd(
     if "p_value" in calls_df.columns:
         p_values = calls_df["p_value"].values
         correction_results = tester.multiple_testing_correction(
-            p_values, method="benjamini_hochberg"
+            p_values,
+            method="benjamini_hochberg",
         )
         click.echo(
-            f"  Multiple testing: {correction_results['n_rejected']}/{correction_results['n_tests']} tests rejected"
+            f"  Multiple testing: {correction_results['n_rejected']}/{correction_results['n_tests']} tests rejected",
         )
 
     # Save validation results
@@ -980,7 +1004,7 @@ def validate_model_cmd(
                 "samples_validated": len(calls_df),
             },
             indent=2,
-        )
+        ),
     )
 
 
