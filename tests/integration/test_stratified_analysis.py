@@ -194,7 +194,10 @@ class TestStratifiedAnalysis:
         self._validate_multi_stratification(results, multi_strata)
 
     def _run_stratified_pipeline(
-        self, config: PipelineConfig, output_path: Path, stratum_info: dict
+        self,
+        config: PipelineConfig,
+        output_path: Path,
+        stratum_info: dict,
     ) -> dict:
         """Run pipeline with stratified analysis."""
         set_global_seed(config.seed)
@@ -234,7 +237,10 @@ class TestStratifiedAnalysis:
         }
 
     def _add_context_info(
-        self, reads_df: pd.DataFrame, context: dict, rng: np.random.Generator
+        self,
+        reads_df: pd.DataFrame,
+        context: dict,
+        rng: np.random.Generator,
     ) -> pd.DataFrame:
         """Add genomic context information to reads."""
         enhanced_df = reads_df.copy()
@@ -245,7 +251,9 @@ class TestStratifiedAnalysis:
         # Add some variation based on context
         n_reads = len(enhanced_df)
         context_error_rates = rng.normal(
-            loc=base_error_rate, scale=base_error_rate * 0.2, size=n_reads
+            loc=base_error_rate,
+            scale=base_error_rate * 0.2,
+            size=n_reads,
         )
 
         # Ensure error rates are positive
@@ -376,7 +384,10 @@ class TestPowerAnalysisStratification:
             self._validate_power_by_depth(result, stratum)
 
     def _run_power_analysis(
-        self, config: PipelineConfig, output_path: Path, stratum_info: dict
+        self,
+        config: PipelineConfig,
+        output_path: Path,
+        stratum_info: dict,
     ) -> dict:
         """Run power analysis for a given stratum."""
         set_global_seed(config.seed)
@@ -421,7 +432,9 @@ class TestPowerAnalysisStratification:
         }
 
     def _calculate_power_metrics(
-        self, calls_df: pd.DataFrame, config: PipelineConfig
+        self,
+        calls_df: pd.DataFrame,
+        config: PipelineConfig,
     ) -> dict:
         """Calculate power analysis metrics."""
         # Group by allele fraction and depth

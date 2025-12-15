@@ -47,7 +47,7 @@ stats:
 lod:
   detection_threshold: 0.95
   confidence_level: 0.95
-""".strip()
+""".strip(),
     )
     return config_path
 
