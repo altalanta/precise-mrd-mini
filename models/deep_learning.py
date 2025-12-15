@@ -26,7 +26,9 @@ class DLVariantCaller(VariantCaller):
         self.training_results: dict[str, Any] = {}
 
     def train(
-        self, collapsed_df: pd.DataFrame, rng: np.random.Generator
+        self,
+        collapsed_df: pd.DataFrame,
+        rng: np.random.Generator,
     ) -> dict[str, Any]:
         """Train the DL model and log the experiment to MLflow."""
         setup_mlflow()
@@ -40,11 +42,13 @@ class DLVariantCaller(VariantCaller):
             # Log metrics
             metrics_to_log = {
                 "optimal_threshold": self.training_results.get(
-                    "optimal_threshold", 0.0
+                    "optimal_threshold",
+                    0.0,
                 ),
                 "validation_loss": self.training_results.get("validation_loss", 0.0),
                 "validation_accuracy": self.training_results.get(
-                    "validation_accuracy", 0.0
+                    "validation_accuracy",
+                    0.0,
                 ),
             }
             mlflow.log_metrics(metrics_to_log)
@@ -57,12 +61,15 @@ class DLVariantCaller(VariantCaller):
             return self.training_results
 
     def predict(
-        self, collapsed_df: pd.DataFrame, error_model_df: pd.DataFrame = None
+        self,
+        collapsed_df: pd.DataFrame,
+        error_model_df: pd.DataFrame = None,
     ) -> pd.DataFrame:
         """Predict variants using the trained DL model."""
         dl_probabilities = self.model.predict_variants(collapsed_df)
         optimal_threshold = self.training_results.get(
-            "optimal_threshold", np.median(dl_probabilities)
+            "optimal_threshold",
+            np.median(dl_probabilities),
         )
         dl_calls = (dl_probabilities > optimal_threshold).astype(int)
 
@@ -81,6 +88,6 @@ class DLVariantCaller(VariantCaller):
                 "dl_threshold": optimal_threshold,
                 "calling_method": f"dl_{self.dl_model_type}",
                 "config_hash": self.config.config_hash(),
-            }
+            },
         )
         return results_df
