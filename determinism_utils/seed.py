@@ -77,7 +77,9 @@ def env_fingerprint() -> dict[str, Any]:
         """Get current git SHA, return 'unknown' if not available."""
         try:
             result = subprocess.check_output(
-                ["git", "rev-parse", "HEAD"], text=True, timeout=5
+                ["git", "rev-parse", "HEAD"],
+                text=True,
+                timeout=5,
             )
             return result.strip()
         except Exception:
