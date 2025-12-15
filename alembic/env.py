@@ -19,7 +19,8 @@ if config.config_file_name is not None:
 
 # Add src to the Python path
 sys.path.insert(
-    0, os.path.realpath(os.path.join(os.path.dirname(__file__), "..", "src"))
+    0,
+    os.path.realpath(os.path.join(os.path.dirname(__file__), "..", "src")),
 )
 
 target_metadata = Base.metadata
