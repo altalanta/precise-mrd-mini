@@ -50,7 +50,7 @@ DEFAULT_N_PARTITIONS: int = 4
 
 
 @pa.check_input(
-    pa.DataFrameSchema(SimulatedReadsSchema.to_schema().columns, strict=False)
+    pa.DataFrameSchema(SimulatedReadsSchema.to_schema().columns, strict=False),
 )
 @pa.check_output(CollapsedUmisSchema)
 def collapse_umis(
@@ -80,7 +80,12 @@ def collapse_umis(
     # Use parallel processing if requested and Dask is available
     if use_parallel and DASK_AVAILABLE and isinstance(reads_df, pd.DataFrame):
         return _collapse_umis_parallel(
-            reads_df, config, rng, output_path, is_fastq_data, n_partitions
+            reads_df,
+            config,
+            rng,
+            output_path,
+            is_fastq_data,
+            n_partitions,
         )
 
     # Fall back to original implementation for other cases
@@ -127,7 +132,7 @@ def _collapse_umis_sequential(
                     "passes_consensus": row["passes_consensus"],
                     "is_variant": False,  # Will be determined by downstream analysis
                     "allele_fraction": 0.0,  # Not available in FASTQ data
-                }
+                },
             )
 
         df = pd.DataFrame(collapsed_data)
@@ -147,7 +152,8 @@ def _collapse_umis_sequential(
                 # Use deterministic family size based on sample statistics
                 # This ensures reproducibility while maintaining performance
                 mean_size = max(
-                    DEFAULT_MIN_MEAN_FAMILY_SIZE, sample["mean_family_size"]
+                    DEFAULT_MIN_MEAN_FAMILY_SIZE,
+                    sample["mean_family_size"],
                 )
                 family_size = max(1, int(rng.poisson(mean_size)))
                 family_size = min(family_size, max_family_size)
@@ -161,7 +167,9 @@ def _collapse_umis_sequential(
                 base_quality = BASE_QUALITY_SCORE + (allele_fraction * QUALITY_AF_SCALE)
                 quality_score = rng.normal(base_quality, QUALITY_SCORE_STD)
                 quality_score = np.clip(
-                    quality_score, MIN_QUALITY_SCORE, MAX_QUALITY_SCORE
+                    quality_score,
+                    MIN_QUALITY_SCORE,
+                    MAX_QUALITY_SCORE,
                 )
 
                 # Determine if consensus passes quality threshold
@@ -202,7 +210,7 @@ def _collapse_umis_sequential(
                         "passes_consensus": passes_consensus,
                         "is_variant": is_variant,
                         "allele_fraction": allele_fraction,
-                    }
+                    },
                 )
 
         df = pd.DataFrame(collapsed_data)
@@ -216,7 +224,9 @@ def _collapse_umis_sequential(
 @delayed
 @parallel_timing_decorator
 def _process_sample_group(
-    group_df: pd.DataFrame, config: PipelineConfig, rng: np.random.Generator
+    group_df: pd.DataFrame,
+    config: PipelineConfig,
+    rng: np.random.Generator,
 ) -> pd.DataFrame:
     """Process a group of samples for parallel UMI collapse."""
     # This is essentially the inner loop of the original sequential implementation
@@ -291,7 +301,7 @@ def _process_sample_group(
                     "passes_consensus": passes_consensus,
                     "is_variant": is_variant,
                     "allele_fraction": allele_fraction,
-                }
+                },
             )
 
     return pd.DataFrame(collapsed_data)
@@ -313,7 +323,7 @@ def _collapse_umis_parallel(
         # We can use Dask's map_partitions for this
         if not DASK_AVAILABLE:
             raise ImportError(
-                "Dask is required for parallel processing but is not available"
+                "Dask is required for parallel processing but is not available",
             )
 
         ddf = dd.from_pandas(reads_df, npartitions=n_partitions or DEFAULT_N_PARTITIONS)
@@ -332,7 +342,7 @@ def _collapse_umis_parallel(
                         "passes_consensus": row["passes_consensus"],
                         "is_variant": False,
                         "allele_fraction": 0.0,
-                    }
+                    },
                 )
             return pd.DataFrame(collapsed_data)
 
@@ -343,7 +353,7 @@ def _collapse_umis_parallel(
         # For synthetic data, we need to group by samples and process each group in parallel
         if not DASK_AVAILABLE:
             raise ImportError(
-                "Dask is required for parallel processing but is not available"
+                "Dask is required for parallel processing but is not available",
             )
 
         # Split dataframe into chunks for parallel processing

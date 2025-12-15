@@ -31,7 +31,9 @@ MAX_QUALITY_SCORE: float = 40.0
 
 @pa.check_output(SimulatedReadsSchema)
 def simulate_reads(
-    config: PipelineConfig, rng: np.random.Generator, output_path: str | None = None
+    config: PipelineConfig,
+    rng: np.random.Generator,
+    output_path: str | None = None,
 ) -> pd.DataFrame:
     """Simulate synthetic UMI reads for ctDNA (circulating tumor DNA) analysis.
 
@@ -99,8 +101,10 @@ def simulate_reads(
     # Create grid of conditions
     conditions = list(
         product(
-            range(len(allele_fractions)), range(len(umi_depths)), range(n_replicates)
-        )
+            range(len(allele_fractions)),
+            range(len(umi_depths)),
+            range(n_replicates),
+        ),
     )
 
     data = []
@@ -116,7 +120,8 @@ def simulate_reads(
 
         # Background error rate (trinucleotide context dependent)
         background_rate = rng.uniform(
-            MIN_BACKGROUND_ERROR_RATE, MAX_BACKGROUND_ERROR_RATE
+            MIN_BACKGROUND_ERROR_RATE,
+            MAX_BACKGROUND_ERROR_RATE,
         )
 
         # Generate reads per family (Poisson distributed)

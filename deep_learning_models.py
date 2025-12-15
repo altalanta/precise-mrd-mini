@@ -96,13 +96,22 @@ class AttentionLayer(nn.Module):
 
         # Reshape for multi-head attention
         Q = Q.view(
-            batch_size, -1, self.num_heads, self.hidden_dim // self.num_heads
+            batch_size,
+            -1,
+            self.num_heads,
+            self.hidden_dim // self.num_heads,
         ).transpose(1, 2)
         K = K.view(
-            batch_size, -1, self.num_heads, self.hidden_dim // self.num_heads
+            batch_size,
+            -1,
+            self.num_heads,
+            self.hidden_dim // self.num_heads,
         ).transpose(1, 2)
         V = V.view(
-            batch_size, -1, self.num_heads, self.hidden_dim // self.num_heads
+            batch_size,
+            -1,
+            self.num_heads,
+            self.hidden_dim // self.num_heads,
         ).transpose(1, 2)
 
         # Attention computation
@@ -269,7 +278,9 @@ class HybridModel(nn.Module):
         )
 
     def forward(
-        self, sequence_input: torch.Tensor, statistical_features: torch.Tensor
+        self,
+        sequence_input: torch.Tensor,
+        statistical_features: torch.Tensor,
     ) -> torch.Tensor:
         """Forward pass through hybrid model.
 
@@ -299,7 +310,10 @@ class DeepLearningVariantCaller:
     """Enhanced deep learning variant caller with multiple architectures."""
 
     def __init__(
-        self, config: PipelineConfig, model_type: str = "hybrid", device: str = "auto"
+        self,
+        config: PipelineConfig,
+        model_type: str = "hybrid",
+        device: str = "auto",
     ):
         """Initialize enhanced deep learning variant caller.
 
@@ -332,7 +346,8 @@ class DeepLearningVariantCaller:
         self.tracker = get_ml_performance_tracker()
 
     def prepare_data(
-        self, collapsed_df: pd.DataFrame
+        self,
+        collapsed_df: pd.DataFrame,
     ) -> tuple[DataLoader, DataLoader, dict[str, Any]]:
         """Prepare data for deep learning training.
 
@@ -382,7 +397,9 @@ class DeepLearningVariantCaller:
 
         # Create data loaders
         train_loader = DataLoader(
-            train_dataset, batch_size=self.batch_size, shuffle=True
+            train_dataset,
+            batch_size=self.batch_size,
+            shuffle=True,
         )
         val_loader = DataLoader(val_dataset, batch_size=self.batch_size, shuffle=False)
 
@@ -420,7 +437,8 @@ class DeepLearningVariantCaller:
         """Generate synthetic labels for training."""
         # Use allele fraction as primary signal with noise
         af_signal = collapsed_df.get(
-            "allele_fraction", pd.Series([0.001] * len(collapsed_df))
+            "allele_fraction",
+            pd.Series([0.001] * len(collapsed_df)),
         )
 
         # Add noise based on quality
@@ -529,7 +547,7 @@ class DNATransformerModel(nn.Module):
                 from transformers import AutoModel, AutoTokenizer
 
                 self.tokenizer = AutoTokenizer.from_pretrained(
-                    "zhihan1996/DNABERT-2-117M"
+                    "zhihan1996/DNABERT-2-117M",
                 )
                 self.bert_model = AutoModel.from_pretrained("zhihan1996/DNABERT-2-117M")
 
@@ -554,7 +572,10 @@ class DNATransformerModel(nn.Module):
 
         # Transformer encoder
         encoder_layer = nn.TransformerEncoderLayer(
-            d_model=d_model, nhead=n_heads, dropout=dropout, batch_first=True
+            d_model=d_model,
+            nhead=n_heads,
+            dropout=dropout,
+            batch_first=True,
         )
         self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=n_layers)
 
@@ -568,7 +589,9 @@ class DNATransformerModel(nn.Module):
         )
 
     def _create_positional_encoding(
-        self, max_length: int, d_model: int
+        self,
+        max_length: int,
+        d_model: int,
     ) -> torch.Tensor:
         """Create positional encoding for transformer."""
         pos_encoding = torch.zeros(max_length, d_model)
@@ -578,7 +601,7 @@ class DNATransformerModel(nn.Module):
                 pos_encoding[pos, i] = np.sin(pos / (10000 ** (2 * i / d_model)))
                 if i + 1 < d_model:
                     pos_encoding[pos, i + 1] = np.cos(
-                        pos / (10000 ** (2 * i / d_model))
+                        pos / (10000 ** (2 * i / d_model)),
                     )
 
         return pos_encoding.unsqueeze(0)
@@ -597,7 +620,10 @@ class DNATransformerModel(nn.Module):
             embeddings = []
             for seq in x_str:
                 inputs = self.tokenizer(
-                    seq, return_tensors="pt", padding=True, truncation=True
+                    seq,
+                    return_tensors="pt",
+                    padding=True,
+                    truncation=True,
                 )
                 with torch.no_grad():
                     outputs = self.bert_model(**inputs)
