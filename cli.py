@@ -18,7 +18,11 @@ from .cache import PipelineCache
 from .call import predict_from_model, train_model
 from .collapse import collapse_umis
 from .config import (
+    LODConfig,
     PipelineConfig,
+    SimulationConfig,
+    StatsConfig,
+    UMIConfig,
     load_config,
 )
 from .determinism_utils import env_fingerprint, set_global_seed, write_manifest
@@ -26,8 +30,14 @@ from .error_model import fit_error_model
 from .eval.lod import LODAnalyzer
 from .eval.stratified import run_stratified_analysis
 from .logging_config import get_logger, setup_logging
+from .models.statistical import StatisticalVariantCaller
 from .metrics import calculate_metrics
-from .performance import get_performance_report, reset_performance_monitor
+from .performance import (
+    get_ml_performance_tracker,
+    get_performance_report,
+    reset_ml_performance_tracker,
+    reset_performance_monitor,
+)
 from .reporting import render_report
 from .sim.contamination import run_contamination_stress_test
 from .simulate import simulate_reads
@@ -179,8 +189,6 @@ def _run_smoke_pipeline(
             fg="yellow",
         ),
     )
-    from .models.statistical import StatisticalVariantCaller
-
     stat_caller = StatisticalVariantCaller(config)
     calls_df = stat_caller.predict(collapsed_df, error_model_df)
     calls_df.to_parquet(calls_path)
@@ -568,7 +576,7 @@ def eval_train_cmd(
 ) -> None:
     """Train a model and register it with MLflow."""
     log = get_logger(__name__)
-    log.info(f"Starting model training for type: {model_type}/{model_subtype}")
+    log.info("Starting model training for type: %s/%s", model_type, model_subtype)
     config = _load_pipeline_config(ctx.config_override, ctx.seed)
     rng = set_global_seed(ctx.seed, deterministic_ops=True)
 
@@ -622,7 +630,7 @@ def eval_predict_cmd(
 ) -> None:
     """Predict MRD status using a trained model from MLflow."""
     log = get_logger(__name__)
-    log.info(f"Starting prediction with model: {model_uri}")
+    log.info("Starting prediction with model: %s", model_uri)
     config = _load_pipeline_config(ctx.config_override, ctx.seed)
 
     collapsed_df = pd.read_parquet(data_in)
@@ -635,7 +643,7 @@ def eval_predict_cmd(
         model_uri=model_uri,
         output_path=output_path,
     )
-    log.info(f"Predictions saved to {output_path}", count=len(results_df))
+    log.info("Predictions saved to %s", output_path)
     click.echo(f"Predictions saved to {output_path}")
 
 
@@ -717,8 +725,6 @@ def eval_stratified_cmd(ctx: CLIContext) -> None:
 
 def create_minimal_config(seed: int) -> PipelineConfig:
     """Create minimal configuration for smoke tests when none is provided."""
-    from .config import LODConfig, SimulationConfig, StatsConfig, UMIConfig
-
     return PipelineConfig(
         run_id="smoke_test",
         seed=seed,
@@ -784,13 +790,11 @@ def performance_cmd(ctx: CLIContext, reset: bool) -> None:
 def ml_performance_cmd(reset: bool) -> None:
     """Show ML model performance metrics."""
     if reset:
-        from .performance import reset_ml_performance_tracker
-
         reset_ml_performance_tracker()
         click.echo("ML performance monitoring data reset.")
         return
 
-    from .performance import get_ml_performance_tracker
+    ml_tracker = get_ml_performance_tracker()
 
     tracker = get_ml_performance_tracker()
     ml_report = tracker.get_ml_report()

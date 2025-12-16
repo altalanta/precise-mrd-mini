@@ -11,16 +11,16 @@ if TYPE_CHECKING:
     import numpy as np
     import pandas as pd
 
-    from .config import PipelineConfig
-    from .data_schemas import (
-        CollapsedUmisSchema,
-        ErrorModelSchema,
-        MLCallsSchema,
-    )
-    from .models.base import VariantCaller
-    from .models.deep_learning import DLVariantCaller
-    from .models.machine_learning import MLVariantCaller
-    from .models.statistical import StatisticalVariantCaller
+from .config import PipelineConfig
+from .data_schemas import (
+    CollapsedUmisSchema,
+    ErrorModelSchema,
+    MLCallsSchema,
+)
+from .models.base import VariantCaller
+from .models.deep_learning import DLVariantCaller
+from .models.machine_learning import MLVariantCaller
+from .models.statistical import StatisticalVariantCaller
 
 
 def get_variant_caller(
