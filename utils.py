@@ -114,7 +114,7 @@ def validate_repository_state() -> list[str]:
                 errors.append(
                     f"Repository has uncommitted source changes: {source_changes}",
                 )
-    except Exception as e:
+    except (subprocess.CalledProcessError, OSError) as e:
         errors.append(f"Could not check git status: {e}")
 
     return errors

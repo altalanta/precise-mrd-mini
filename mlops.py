@@ -31,7 +31,9 @@ def setup_mlflow():
 
     mlflow.set_experiment(experiment_name)
     log.info(
-        f"MLflow tracking enabled. URI: '{mlflow.get_tracking_uri()}', Experiment: '{experiment_name}'",
+        "MLflow tracking enabled. URI: '%s', Experiment: '%s'",
+        mlflow.get_tracking_uri(),
+        experiment_name,
     )
 
 
@@ -53,7 +55,7 @@ def log_pipeline_run(
         tags: Optional dictionary of tags to set for the run.
     """
     with mlflow.start_run(run_name=run_name) as run:
-        log.info(f"Starting MLflow run: {run.info.run_name} ({run.info.run_id})")
+        log.info("Starting MLflow run: %s (%s)", run.info.run_name, run.info.run_id)
 
         # Log parameters
         mlflow.log_params(params)
@@ -79,16 +81,18 @@ def log_pipeline_run(
                             mlflow.log_metric(f"af_{af}_{key}", value)
         else:
             log.warning(
-                f"Metrics file not found at {metrics_path}, skipping metric logging.",
+                "Metrics file not found at %s, skipping metric logging.",
+                metrics_path,
             )
 
         # Log all artifacts from the output directory
         if artifacts_dir.is_dir():
             mlflow.log_artifacts(str(artifacts_dir), artifact_path="results")
-            log.info(f"Logged artifacts from directory: {artifacts_dir}")
+            log.info("Logged artifacts from directory: %s", artifacts_dir)
         else:
             log.warning(
-                f"Artifacts directory not found at {artifacts_dir}, skipping artifact logging.",
+                "Artifacts directory not found at %s, skipping artifact logging.",
+                artifacts_dir,
             )
 
         log.info(f"Completed MLflow run: {run.info.run_name}")

@@ -213,7 +213,7 @@ class FASTQReader:
                         stats["mean_quality"] * i + read["mean_quality"]
                     ) / (i + 1)
 
-        except Exception as e:
+        except (OSError, ValueError, UnicodeDecodeError) as e:
             stats["is_valid"] = False
             stats["errors"].append(str(e))
 
