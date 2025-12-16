@@ -305,7 +305,7 @@ class GradientBoostedVariantCaller:
                     y,
                     predictions,
                 )
-            except Exception:
+            except (ValueError, AttributeError, RuntimeError):
                 pass
 
         tracker.record_model_metrics(f"{self.model_type}_model", model_metrics)
@@ -614,7 +614,7 @@ class EnsembleVariantCaller:
                     y,
                     ensemble_predictions,
                 )
-            except Exception:
+            except (ValueError, AttributeError, RuntimeError):
                 pass
 
         tracker.record_model_metrics("ensemble_model", ensemble_metrics)
