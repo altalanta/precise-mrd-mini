@@ -101,7 +101,7 @@ def verify_manifest(manifest_path: str | pathlib.Path) -> dict[str, bool]:
             try:
                 actual_hash = hash_file(file_path)
                 results[file_path] = actual_hash == expected_hash
-            except Exception:
+            except (OSError, ValueError):
                 results[file_path] = False
 
     return results

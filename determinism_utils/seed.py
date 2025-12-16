@@ -55,7 +55,7 @@ def set_global_seed(seed: int, deterministic_ops: bool = True) -> np.random.Gene
 
     except ImportError:
         pass  # PyTorch not available, skip
-    except Exception:
+    except (RuntimeError, AttributeError):
         # Catch any PyTorch-specific errors but don't fail
         pass
 
@@ -82,7 +82,7 @@ def env_fingerprint() -> dict[str, Any]:
                 timeout=5,
             )
             return result.strip()
-        except Exception:
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError):
             return "unknown"
 
     # Core environment info
@@ -121,7 +121,7 @@ def env_fingerprint() -> dict[str, Any]:
     try:
         fingerprint["cpu_count"] = os.cpu_count()
         fingerprint["machine"] = platform.machine()
-    except Exception:
+    except (OSError, AttributeError):
         pass
 
     return fingerprint
