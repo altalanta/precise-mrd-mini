@@ -404,7 +404,7 @@ class LODAnalyzer:
 
             return 10**log_af_lod
 
-        except Exception:
+        except (ValueError, ZeroDivisionError, RuntimeError):
             # Fallback: linear interpolation
             from scipy.interpolate import interp1d
 
@@ -438,7 +438,7 @@ class LODAnalyzer:
             try:
                 boot_lod = self._fit_detection_curve(boot_af, boot_hit, target_rate)
                 bootstrap_lods.append(boot_lod)
-            except Exception:
+            except (ValueError, ZeroDivisionError, RuntimeError):
                 continue
 
         if bootstrap_lods:
