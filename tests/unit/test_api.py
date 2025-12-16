@@ -13,3 +13,4 @@ def test_health_check():
     assert data["api_status"] == "ok"
     assert "db_status" in data
     assert "cache_status" in data
+
