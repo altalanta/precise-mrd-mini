@@ -5,6 +5,7 @@ from __future__ import annotations
 import copy
 import hashlib
 from abc import ABC, abstractmethod
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Self
 
@@ -293,8 +294,6 @@ class PipelineConfig(BaseModel):
 
     def _set_timestamps(self):
         """Set creation and modification timestamps using UTC."""
-        from datetime import datetime, timezone
-
         now = datetime.now(timezone.utc).isoformat()
         if not self.created_at:
             self.created_at = now
