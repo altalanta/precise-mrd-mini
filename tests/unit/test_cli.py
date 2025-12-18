@@ -11,3 +11,4 @@ def test_cli_help():
     assert "Usage: main [OPTIONS] COMMAND [ARGS]..." in result.output
     assert "Deterministic ctDNA/UMI MRD pipeline" in result.output
 
+
